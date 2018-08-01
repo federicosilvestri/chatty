@@ -1,19 +1,11 @@
-image: gcc
+image: ubuntu
 
 build:
   stage: build
   before_script: 
-    - apt update && apt -y install make 
+     - apt update && apt -y install make gcc valgrind 
   script: 
-    - gcc helloworld.cpp -o mybinary
+    - make all
   artifacts:
     paths:
       - bin
-   cache:
-     paths:
-       - "*.o"
-# run tests using the binary built before
-test:
-  stage: test
-  script:
-    - make all
