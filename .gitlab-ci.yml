@@ -1,0 +1,11 @@
+image: ubuntu
+
+build:
+  stage: build
+  before_script: 
+     - apt update && apt -y install make gcc valgrind 
+  script: 
+    - make all
+  artifacts:
+    paths:
+      - bin
