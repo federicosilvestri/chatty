@@ -45,6 +45,7 @@
 
 # Binary files
 bin/
+Debug/
 
 # Kernel Module Compile Results
 *.mod*

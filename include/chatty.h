@@ -8,11 +8,23 @@
  * originale dell'autore.
  *
 */
-#include <stdbool.h>
 
 #ifndef PROJECT_CHATTY_H
 #define PROJECT_CHATTY_H
 
-#endif //PROJECT_CHATTY_H
+//#define LOG_USE_COLOR 1
+
+#include <stdbool.h>
+#include <errno.h>
+#include "libconfig.h"
+#include "stats.h"
+#include "log.h"
+#include "config.h"
+
+// structure that contains server configuration
+config_t server_conf;
 
 static inline bool check_arguments(int, char**);
+bool parse_config(char*);
+
+#endif //PROJECT_CHATTY_H
