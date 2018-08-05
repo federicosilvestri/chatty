@@ -5,7 +5,7 @@ build:
   before_script: 
      - apt update && apt -y install make gcc valgrind 
   script: 
-    - ls -la
+    - test_build.sh
   artifacts:
     paths:
       - bin
