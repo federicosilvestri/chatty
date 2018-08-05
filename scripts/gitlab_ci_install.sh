@@ -2,4 +2,4 @@
 
 echo "Installing dependencies..."
 
-apt install libconfig9 libconfig-dev
+apt-get install -qy libconfig9 libconfig-dev
