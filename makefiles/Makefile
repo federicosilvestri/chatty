@@ -67,7 +67,7 @@ INCLUDE_FILES   = connections.h \
 		  signal_handler.h
 
 
-.PHONY: gitlab-deps deps all clean cleanall test1 test2 test3 test4 test5 consegna
+.PHONY: deps all clean cleanall test1 test2 test3 test4 test5 consegna
 .SUFFIXES: .c .h
 
 %: %.c
@@ -87,9 +87,6 @@ client: client.o connections.o message.h
 	
 deps	: 
 	./component_install.sh
-	
-gitlab-deps	:
-	./gitlab_ci_install.sh
 	
 ############################ non modificare da qui in poi
 

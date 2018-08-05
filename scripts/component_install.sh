@@ -2,4 +2,12 @@
 
 echo "Installing component for project"
 
-sudo apt install -y libconfig-dev libconfig9
+# Checking the existence of sudo command...
+
+su_cmd=""
+
+if [ -x "$(command -v sudo)" ]; then
+	su_cmd="sudo"
+fi
+
+$su_cmd apt install -y libconfig-dev libconfig9
