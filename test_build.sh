@@ -17,4 +17,5 @@ chmod a+x ./TestDebug/*.sh
 echo "Launching make..."
 cd TestDebug
 ls -a
-make dev-test
+make $1
+make chatty

@@ -5,7 +5,7 @@ build:
   before_script: 
      - apt update && apt -y install make gcc valgrind 
   script: 
-    - /bin/bash test_build.sh
+    - /bin/bash test_build.sh gitlab-deps
   artifacts:
     paths:
       - bin

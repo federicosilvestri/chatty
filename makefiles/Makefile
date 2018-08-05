@@ -67,7 +67,7 @@ INCLUDE_FILES   = connections.h \
 		  signal_handler.h
 
 
-.PHONY: dev-test dependencies all clean cleanall test1 test2 test3 test4 test5 consegna
+.PHONY: gitlab-deps deps all clean cleanall test1 test2 test3 test4 test5 consegna
 .SUFFIXES: .c .h
 
 %: %.c
@@ -85,10 +85,11 @@ chatty: chatty.o log.o signal_handler.o libchatty.a $(INCLUDE_FILES)
 client: client.o connections.o message.h
 	$(CC) $(CFLAGS) $(INCLUDES) $(OPTFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 	
-dev-test	: dependencies chatty
-
-dependencies	: 
+deps	: 
 	./component_install.sh
+	
+gitlab-deps	:
+	./gitlab_ci_install.sh
 	
 ############################ non modificare da qui in poi
 
