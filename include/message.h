@@ -11,60 +11,75 @@
 #include <assert.h>
 #include <string.h>
 #include <config.h>
-#include <ops.h>
+#include "ops.h"
 
 /**
  * @file  message.h
  * @brief Contiene il formato del messaggio
  */
 
-
 /**
- *  @struct header
+ *  @struct message_hdr_t
  *  @brief header del messaggio 
  *
- *  @var op tipo di operazione richiesta al server
- *  @var sender nickname del mittente 
  */
 typedef struct {
-    op_t     op;   
-    char sender[MAX_NAME_LENGTH+1];
+	/**
+	 * Sipo di connessione richiesta al server
+	 */
+	op_t op;
+	/**
+	 * Sender nickname del mittente
+	 */
+	char sender[MAX_NAME_LENGTH + 1];
 } message_hdr_t;
 
 /**
- *  @struct header
+ *  @struct message_data_hdr_t
  *  @brief header della parte dati
- *
- *  @var receiver nickname del ricevente
- *  @var len lunghezza del buffer dati
  */
 typedef struct {
-    char receiver[MAX_NAME_LENGTH+1];
-    unsigned int   len;  
+	/**
+	 * Nickname del ricevente
+	 */
+	char receiver[MAX_NAME_LENGTH + 1];
+
+	/**
+	 * Lunghezza del buffer dati
+	 */
+	unsigned int len;
 } message_data_hdr_t;
 
 /**
- *  @struct data
+ *  @struct message_data_t
  *  @brief body del messaggio 
- *
- *  @var hdr header della parte dati
- *  @var buf buffer dati
  */
 typedef struct {
-    message_data_hdr_t  hdr;
-    char               *buf;
+	/**
+	 * Header della parte dati
+	 */
+	message_data_hdr_t hdr;
+
+	/**
+	 * Buffer dati
+	 */
+	char *buf;
 } message_data_t;
 
 /**
- *  @struct messaggio
+ *  @struct message_t
  *  @brief tipo del messaggio 
  *
- *  @var hdr header
- *  @var data dati
  */
 typedef struct {
-    message_hdr_t  hdr;
-    message_data_t data;
+	/**
+	 * Header del messaggio
+	 */
+	message_hdr_t hdr;
+	/**
+	 * Dati del messaggio
+	 */
+	message_data_t data;
 } message_t;
 
 /* ------ funzioni di utilità ------- */
@@ -79,10 +94,10 @@ typedef struct {
  */
 static inline void setHeader(message_hdr_t *hdr, op_t op, char *sender) {
 #if defined(MAKE_VALGRIND_HAPPY)
-    memset((char*)hdr, 0, sizeof(message_hdr_t));
+	memset((char*)hdr, 0, sizeof(message_hdr_t));
 #endif
-    hdr->op  = op;
-    strncpy(hdr->sender, sender, strlen(sender)+1);
+	hdr->op = op;
+	strncpy(hdr->sender, sender, strlen(sender) + 1);
 }
 /**
  * @function setData
@@ -93,16 +108,15 @@ static inline void setHeader(message_hdr_t *hdr, op_t op, char *sender) {
  * @param buf puntatore al buffer 
  * @param len lunghezza del buffer
  */
-static inline void setData(message_data_t *data, char *rcv, const char *buf, unsigned int len) {
+static inline void setData(message_data_t *data, char *rcv, const char *buf,
+		unsigned int len) {
 #if defined(MAKE_VALGRIND_HAPPY)
-    memset((char*)&(data->hdr), 0, sizeof(message_data_hdr_t));
+	memset((char*)&(data->hdr), 0, sizeof(message_data_hdr_t));
 #endif
 
-    strncpy(data->hdr.receiver, rcv, strlen(rcv)+1);
-    data->hdr.len  = len;
-    data->buf      = (char *)buf;
+	strncpy(data->hdr.receiver, rcv, strlen(rcv) + 1);
+	data->hdr.len = len;
+	data->buf = (char *) buf;
 }
-
-
 
 #endif /* MESSAGE_H_ */

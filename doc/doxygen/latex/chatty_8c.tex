@@ -1,0 +1,120 @@
+\hypertarget{chatty_8c}{}\section{src/chatty.c File Reference}
+\label{chatty_8c}\index{src/chatty.\+c@{src/chatty.\+c}}
+
+
+File principale del server chatterbox.  
+
+
+{\ttfamily \#include $<$stdio.\+h$>$}\newline
+{\ttfamily \#include $<$unistd.\+h$>$}\newline
+{\ttfamily \#include $<$stdlib.\+h$>$}\newline
+{\ttfamily \#include $<$assert.\+h$>$}\newline
+{\ttfamily \#include $<$string.\+h$>$}\newline
+{\ttfamily \#include $<$signal.\+h$>$}\newline
+{\ttfamily \#include $<$pthread.\+h$>$}\newline
+{\ttfamily \#include \char`\"{}chatty.\+h\char`\"{}}\newline
+Include dependency graph for chatty.\+c\+:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{chatty_8c__incl}
+\end{center}
+\end{figure}
+\subsection*{Macros}
+\begin{DoxyCompactItemize}
+\item 
+\#define \hyperlink{chatty_8c_a3024ccd4a9af5109d24e6c57565d74a1}{\+\_\+\+P\+O\+S\+I\+X\+\_\+\+C\+\_\+\+S\+O\+U\+R\+CE}~200809L
+\end{DoxyCompactItemize}
+\subsection*{Functions}
+\begin{DoxyCompactItemize}
+\item 
+int \hyperlink{chatty_8c_a0ddf1224851353fc92bfbff6f499fa97}{main} (int argc, char $\ast$argv\mbox{[}$\,$\mbox{]})
+\item 
+bool \hyperlink{chatty_8c_aad12432f8ae837b800280246037a3c1c}{check\+\_\+arguments} (int argc, char $\ast$argv\mbox{[}$\,$\mbox{]})
+\item 
+bool \hyperlink{chatty_8c_a9d083242d81f6a5b934b560402526368}{parse\+\_\+config} (char $\ast$conf\+\_\+file\+\_\+path)
+\begin{DoxyCompactList}\small\item\em This function load into memory the file passed as configuration file. If any problem occurs during loading it returns false. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{chatty_8c_af6fb578a8004391d404dce76d9ee0351}\label{chatty_8c_af6fb578a8004391d404dce76d9ee0351}} 
+void \hyperlink{chatty_8c_af6fb578a8004391d404dce76d9ee0351}{clean\+\_\+workspace} ()
+\begin{DoxyCompactList}\small\item\em clean workspace from any leaks. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+struct \hyperlink{structstatistics}{statistics} \hyperlink{chatty_8c_a9e4166354e886d074465ab1bb87ca0e2}{chatty\+Stats} = \{ 0, 0, 0, 0, 0, 0, 0 \}
+\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+File principale del server chatterbox. 
+
+
+
+\subsection{Macro Definition Documentation}
+\mbox{\Hypertarget{chatty_8c_a3024ccd4a9af5109d24e6c57565d74a1}\label{chatty_8c_a3024ccd4a9af5109d24e6c57565d74a1}} 
+\index{chatty.\+c@{chatty.\+c}!\+\_\+\+P\+O\+S\+I\+X\+\_\+\+C\+\_\+\+S\+O\+U\+R\+CE@{\+\_\+\+P\+O\+S\+I\+X\+\_\+\+C\+\_\+\+S\+O\+U\+R\+CE}}
+\index{\+\_\+\+P\+O\+S\+I\+X\+\_\+\+C\+\_\+\+S\+O\+U\+R\+CE@{\+\_\+\+P\+O\+S\+I\+X\+\_\+\+C\+\_\+\+S\+O\+U\+R\+CE}!chatty.\+c@{chatty.\+c}}
+\subsubsection{\texorpdfstring{\+\_\+\+P\+O\+S\+I\+X\+\_\+\+C\+\_\+\+S\+O\+U\+R\+CE}{\_POSIX\_C\_SOURCE}}
+{\footnotesize\ttfamily \#define \+\_\+\+P\+O\+S\+I\+X\+\_\+\+C\+\_\+\+S\+O\+U\+R\+CE~200809L}
+
+C P\+O\+S\+IX source definition. 
+
+\subsection{Function Documentation}
+\mbox{\Hypertarget{chatty_8c_aad12432f8ae837b800280246037a3c1c}\label{chatty_8c_aad12432f8ae837b800280246037a3c1c}} 
+\index{chatty.\+c@{chatty.\+c}!check\+\_\+arguments@{check\+\_\+arguments}}
+\index{check\+\_\+arguments@{check\+\_\+arguments}!chatty.\+c@{chatty.\+c}}
+\subsubsection{\texorpdfstring{check\+\_\+arguments()}{check\_arguments()}}
+{\footnotesize\ttfamily bool check\+\_\+arguments (\begin{DoxyParamCaption}\item[{int}]{argc,  }\item[{char $\ast$}]{argv\mbox{[}$\,$\mbox{]} }\end{DoxyParamCaption})}
+
+This function checks if argument passed by system are valid or not.
+
+
+\begin{DoxyParams}{Parameters}
+{\em argc} & system argument count \\
+\hline
+{\em argv} & system argument \\
+\hline
+\end{DoxyParams}
+\begin{DoxyReturn}{Returns}
+true if arguments are valid, false otherwise 
+\end{DoxyReturn}
+\mbox{\Hypertarget{chatty_8c_a0ddf1224851353fc92bfbff6f499fa97}\label{chatty_8c_a0ddf1224851353fc92bfbff6f499fa97}} 
+\index{chatty.\+c@{chatty.\+c}!main@{main}}
+\index{main@{main}!chatty.\+c@{chatty.\+c}}
+\subsubsection{\texorpdfstring{main()}{main()}}
+{\footnotesize\ttfamily int main (\begin{DoxyParamCaption}\item[{int}]{argc,  }\item[{char $\ast$}]{argv\mbox{[}$\,$\mbox{]} }\end{DoxyParamCaption})}
+
+Main function that is called from system. 
+\begin{DoxyParams}{Parameters}
+{\em argc} & argument count \\
+\hline
+{\em argv} & array of string that contains arguments \\
+\hline
+\end{DoxyParams}
+\begin{DoxyReturn}{Returns}
+program exit code. 
+\end{DoxyReturn}
+\mbox{\Hypertarget{chatty_8c_a9d083242d81f6a5b934b560402526368}\label{chatty_8c_a9d083242d81f6a5b934b560402526368}} 
+\index{chatty.\+c@{chatty.\+c}!parse\+\_\+config@{parse\+\_\+config}}
+\index{parse\+\_\+config@{parse\+\_\+config}!chatty.\+c@{chatty.\+c}}
+\subsubsection{\texorpdfstring{parse\+\_\+config()}{parse\_config()}}
+{\footnotesize\ttfamily bool parse\+\_\+config (\begin{DoxyParamCaption}\item[{char $\ast$}]{conf\+\_\+file\+\_\+path }\end{DoxyParamCaption})}
+
+
+
+This function load into memory the file passed as configuration file. If any problem occurs during loading it returns false. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em conf\+\_\+file\+\_\+path} & string that represents the path of config file. \\
+\hline
+\end{DoxyParams}
+
+
+\subsection{Variable Documentation}
+\mbox{\Hypertarget{chatty_8c_a9e4166354e886d074465ab1bb87ca0e2}\label{chatty_8c_a9e4166354e886d074465ab1bb87ca0e2}} 
+\index{chatty.\+c@{chatty.\+c}!chatty\+Stats@{chatty\+Stats}}
+\index{chatty\+Stats@{chatty\+Stats}!chatty.\+c@{chatty.\+c}}
+\subsubsection{\texorpdfstring{chatty\+Stats}{chattyStats}}
+{\footnotesize\ttfamily struct \hyperlink{structstatistics}{statistics} chatty\+Stats = \{ 0, 0, 0, 0, 0, 0, 0 \}}
+
+Variable to register statistics. 

@@ -11,18 +11,41 @@
 #include <stdio.h>
 #include <time.h>
 
+/**
+ * Statistics structure.
+ */
 struct statistics {
-    unsigned long nusers;                       // n. di utenti registrati
-    unsigned long nonline;                      // n. di utenti connessi
-    unsigned long ndelivered;                   // n. di messaggi testuali consegnati
-    unsigned long nnotdelivered;                // n. di messaggi testuali non ancora consegnati
-    unsigned long nfiledelivered;               // n. di file consegnati
-    unsigned long nfilenotdelivered;            // n. di file non ancora consegnati
-    unsigned long nerrors;                      // n. di messaggi di errore
+	/**
+	 * Registered users
+	 */
+	unsigned long nusers;
+	/**
+	 * Online users
+	 */
+	unsigned long nonline;
+	/**
+	 * Number of delivered messages
+	 */
+	unsigned long ndelivered;
+	/**
+	 * Number of not delivered messages
+	 */
+	unsigned long nnotdelivered;
+	/**
+	 * Number of file delivered
+	 */
+	unsigned long nfiledelivered;
+	/**
+	 * Number of file not delivered
+	 */
+	unsigned long nfilenotdelivered;
+	/**
+	 * Number of errors
+	 */
+	unsigned long nerrors;
 };
 
 /* aggiungere qui altre funzioni di utilita' per le statistiche */
-
 
 /**
  * @function printStats
@@ -33,20 +56,16 @@ struct statistics {
  * @return 0 in caso di successo, -1 in caso di fallimento 
  */
 static inline int printStats(FILE *fout) {
-    extern struct statistics chattyStats;
+	extern struct statistics chattyStats;
 
-    if (fprintf(fout, "%ld - %ld %ld %ld %ld %ld %ld %ld\n",
-		(unsigned long)time(NULL),
-		chattyStats.nusers, 
-		chattyStats.nonline,
-		chattyStats.ndelivered,
-		chattyStats.nnotdelivered,
-		chattyStats.nfiledelivered,
-		chattyStats.nfilenotdelivered,
-		chattyStats.nerrors
-		) < 0) return -1;
-    fflush(fout);
-    return 0;
+	if (fprintf(fout, "%ld - %ld %ld %ld %ld %ld %ld %ld\n",
+			(unsigned long) time(NULL), chattyStats.nusers, chattyStats.nonline,
+			chattyStats.ndelivered, chattyStats.nnotdelivered,
+			chattyStats.nfiledelivered, chattyStats.nfilenotdelivered,
+			chattyStats.nerrors) < 0)
+		return -1;
+	fflush(fout);
+	return 0;
 }
 
 #endif /* MEMBOX_STATS_ */

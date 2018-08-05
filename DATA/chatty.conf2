@@ -13,7 +13,7 @@
 #             StatFileName = /tmp/chatty_stats_<numero-di-matricola>.txt
 
 # directory dove memorizzare i files da inviare agli utenti 
-DirName          = /tmp/chatty 
+DirName          = "/tmp/chatty" 
 
 # dimensione massima di un file accettato dal server (kilobytes)
 MaxFileSize      = 50
@@ -31,10 +31,10 @@ MaxMsgSize       = 10
 MaxHistMsgs      = 2
 
 # file nel quale verranno scritte le statistiche del server
-StatFileName     = /tmp/chatty_stats.txt
+StatFileName     = "/tmp/chatty_stats.txt"
 
 # path utilizzato per la creazione del socket AF_UNIX
-UnixPath         = /tmp/chatty_socket
+UnixPath         = "/tmp/chatty_socket"
 
 # --------------------------------------------------------------
 

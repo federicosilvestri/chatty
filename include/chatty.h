@@ -12,19 +12,21 @@
 #ifndef PROJECT_CHATTY_H
 #define PROJECT_CHATTY_H
 
-//#define LOG_USE_COLOR 1
-
 #include <stdbool.h>
 #include <errno.h>
-#include "libconfig.h"
-#include "stats.h"
+#include <signal.h>
+#include <libconfig.h>
+
 #include "log.h"
+#include "stats.h"
 #include "config.h"
+#include "signal_handler.h"
 
 // structure that contains server configuration
 config_t server_conf;
 
-static inline bool check_arguments(int, char**);
+bool check_arguments(int, char**);
 bool parse_config(char*);
+void clean_workspace();
 
 #endif //PROJECT_CHATTY_H

@@ -14,7 +14,9 @@
  * @brief Contiene i codici delle operazioni di richiesta e risposta
  */
 
-
+/**
+ * @enum op_t it describes operations that server manages
+ */
 typedef enum {
 
     /* ------------------------------------------ */

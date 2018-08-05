@@ -8,22 +8,30 @@
 #ifndef CONNECTIONS_H_
 #define CONNECTIONS_H_
 
+/**
+ * How many time retry to send message.
+ */
 #define MAX_RETRIES     10
+/**
+ * How many time a server can sleep.
+ */
 #define MAX_SLEEPING     3
 #if !defined(UNIX_PATH_MAX)
+/**
+ * UNIX path max definition.
+ */
 #define UNIX_PATH_MAX  64
 #endif
 
 #include <message.h>
 
 /**
- * @file  connection.h
+ * @file  connections.h
  * @brief Contiene le funzioni che implementano il protocollo 
  *        tra i clients ed il server
  */
 
 /**
- * @function openConnection
  * @brief Apre una connessione AF_UNIX verso il server 
  *
  * @param path Path del socket AF_UNIX 
@@ -37,18 +45,17 @@ int openConnection(char* path, unsigned int ntimes, unsigned int secs);
 
 // -------- server side ----- 
 /**
- * @function readHeader
  * @brief Legge l'header del messaggio
  *
- * @param fd     descrittore della connessione
+ * @param connfd     descrittore della connessione
  * @param hdr    puntatore all'header del messaggio da ricevere
  *
  * @return <=0 se c'e' stato un errore 
  *         (se <0 errno deve essere settato, se == 0 connessione chiusa) 
  */
 int readHeader(long connfd, message_hdr_t *hdr);
+
 /**
- * @function readData
  * @brief Legge il body del messaggio
  *
  * @param fd     descrittore della connessione
@@ -60,11 +67,10 @@ int readHeader(long connfd, message_hdr_t *hdr);
 int readData(long fd, message_data_t *data);
 
 /**
- * @function readMsg
  * @brief Legge l'intero messaggio
  *
  * @param fd     descrittore della connessione
- * @param data   puntatore al messaggio
+ * @param msg   puntatore al messaggio
  *
  * @return <=0 se c'e' stato un errore
  *         (se <0 errno deve essere settato, se == 0 connessione chiusa) 
@@ -76,7 +82,6 @@ int readMsg(long fd, message_t *msg);
 
 // ------- client side ------
 /**
- * @function sendRequest
  * @brief Invia un messaggio di richiesta al server 
  *
  * @param fd     descrittore della connessione
@@ -87,7 +92,6 @@ int readMsg(long fd, message_t *msg);
 int sendRequest(long fd, message_t *msg);
 
 /**
- * @function sendData
  * @brief Invia il body del messaggio al server
  *
  * @param fd     descrittore della connessione
