@@ -85,7 +85,7 @@ chatty: chatty.o log.o signal_handler.o libchatty.a $(INCLUDE_FILES)
 client: client.o connections.o message.h
 	$(CC) $(CFLAGS) $(INCLUDES) $(OPTFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 	
-dev-test	: chatty
+dev-test	: dependencies chatty
 
 dependencies	: 
 	./component_install.sh
