@@ -9,12 +9,12 @@ if [ -x "$(command -v sudo)" ]; then
 	su_cmd="sudo"
 fi
 
-# $su_cmd apt install -y libconfig-dev libconfig9 rabbitmq-server librabbitmq4 librabbitmq-dev
-#
-#if ! [ $? -eq 0 ]; then
-#	echo "Problem during install dependencies!"
-#	exit 1
-#fi
+$su_cmd apt install -y libconfig-dev libconfig9 rabbitmq-server librabbitmq4 librabbitmq-dev
+
+if ! [ $? -eq 0 ]; then
+	echo "Problem during install dependencies!"
+	exit 1
+fi
 
 echo "Restarting RabbitMQ server..."
 
