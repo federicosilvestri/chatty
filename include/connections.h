@@ -5,6 +5,13 @@
  * Docenti: Prencipe, Torquati
  * 
  */
+
+/**
+ * @file  connections.h
+ * @brief Contiene le funzioni che implementano il protocollo
+ *        tra i clients ed il server
+ */
+
 #ifndef CONNECTIONS_H_
 #define CONNECTIONS_H_
 
@@ -23,13 +30,7 @@
 #define UNIX_PATH_MAX  64
 #endif
 
-#include <message.h>
-
-/**
- * @file  connections.h
- * @brief Contiene le funzioni che implementano il protocollo 
- *        tra i clients ed il server
- */
+#include "message.h"
 
 /**
  * @brief Apre una connessione AF_UNIX verso il server 

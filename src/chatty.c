@@ -11,7 +11,7 @@
  */
 
 /**
- * C POSIX source definition.
+ * Define Posix Source
  */
 #define _POSIX_C_SOURCE 200809L
 
@@ -20,10 +20,17 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
-#include <signal.h>
-#include <pthread.h>
 
-/* inserire gli altri include che servono */
+#include <errno.h>
+#include <libconfig.h>
+#include <signal.h>
+
+#include "log.h"
+#include "stats.h"
+#include "config.h"
+#include "server.h"
+#include "signal_handler.h"
+
 #include "chatty.h"
 
 /**
@@ -51,7 +58,7 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	if (parse_config(argv[2]) == false) {
+	if (config_parse(argv[2]) == false) {
 		return 1;
 	}
 
@@ -94,70 +101,6 @@ bool check_arguments(int argc, char *argv[]) {
 	return true;
 }
 
-/**
- * @brief This function load into memory the file passed as configuration file.
- * If any problem occurs during loading it returns false.
- * @param conf_file_path string that represents the path of config file.
- *
- */
-bool parse_config(char *conf_file_path) {
-	// initialize configuration structure
-	config_init(&server_conf);
-
-	// try to load
-	if (config_read_file(&server_conf, conf_file_path) != CONFIG_TRUE) {
-		log_error("Configuration reading error on line %d: %s, %s",
-				config_error_line(&server_conf),
-				config_error_text(&server_conf), strerror(errno));
-
-		config_destroy(&server_conf);
-
-		return false;
-	}
-
-	log_debug("Configuration file loaded");
-
-	// checking if all mandatory parameters are specified
-	int miss_param = -1;
-
-	for (int i = 0; i < CONFIG_REQUIRED_PARAMS_SIZE && miss_param == -1; i++) {
-		const char *str_value;
-		int int_value = 0;
-
-		switch (config_req_params_type[i]) {
-		case CONF_STRING_T:
-			if (config_lookup_string(&server_conf, config_req_params[i],
-					&str_value) == CONFIG_FALSE) {
-				miss_param = i;
-			}
-			break;
-		case CONF_INT_T:
-			if (config_lookup_int(&server_conf, config_req_params[i],
-					&int_value) == CONFIG_FALSE) {
-				miss_param = i;
-			}
-			break;
-		}
-	}
-
-	if (miss_param != -1) {
-		log_error(
-				"Configuration test failed: missing mandatory configuration parameter \"%s\"",
-				config_req_params[miss_param]);
-
-		config_destroy(&server_conf);
-		return false;
-	}
-
-	log_debug("Configuration file test passed");
-	return true;
-}
-
-/**
- * @brief clean workspace from any leaks.
- */
 void clean_workspace() {
-	// destroy config, only for now
-	config_destroy(&server_conf);
-
+	config_clean();
 }

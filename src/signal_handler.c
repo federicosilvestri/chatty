@@ -11,6 +11,17 @@
  */
 #include "signal_handler.h"
 
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <assert.h>
+#include <string.h>
+#include <pthread.h>
+#include <stdbool.h>
+#include <errno.h>
+
+#include "log.h"
+
 /**
  * Registered signal to register to system
  */

@@ -13,16 +13,12 @@
 #if !defined(CONFIG_H_)
 #define CONFIG_H_
 
+#include <stdbool.h>
+
 /**
  * Max length of user name
  */
 #define MAX_NAME_LENGTH	32
-
-/**
- * Size of array that contains required configuration
- * parameters
- */
-#define CONFIG_REQUIRED_PARAMS_SIZE 8
 
 /**
  * Represents the string type of configuration parameter
@@ -34,16 +30,18 @@
  */
 #define CONF_INT_T 1
 
-static const char *config_req_params[] = { "UnixPath", "MaxConnections",
-		"ThreadsInPool", "MaxMsgSize", "MaxFileSize", "MaxHistMsgs", "DirName",
-		"StatFileName" };
-
-static const char config_req_params_type[] = { CONF_STRING_T, CONF_INT_T, CONF_INT_T, \
-		CONF_INT_T, CONF_INT_T, CONF_INT_T, CONF_STRING_T, CONF_STRING_T };
+/**
+ * @brief This function load into memory the file passed as configuration file.
+ * If any problem occurs during loading it returns false.
+ * @param conf_file_path string that represents the path of config file.
+ *
+ */
+bool config_parse(char *conf_file_path);
 
 /**
- * to avoid warnings like "ISO C forbids an empty translation unit"
+ * @brief clean workspace from any leaks.
  */
-typedef int make_iso_compilers_happy;
+void config_clean();
+
 
 #endif /* CONFIG_H_ */

@@ -4,25 +4,17 @@
  *  Created on: Aug 4, 2018
  *      Author: federicosilvestri
  */
-/**
- * Define Posix Source
- */
-#define _POSIX_C_SOURCE 200809L
 
 #ifndef SIGNAL_HANDLER_H_
 #define SIGNAL_HANDLER_H_
 
-#include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <assert.h>
-#include <string.h>
-#include <signal.h>
-#include <pthread.h>
-#include <stdbool.h>
-#include <errno.h>
+/**
+ * C POSIX source definition.
+ */
+#define _POSIX_C_SOURCE 200809L
 
-#include "log.h"
+#include <stdbool.h>
+#include <signal.h>
 
 /**
  * How many signals are registered.

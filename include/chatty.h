@@ -12,18 +12,12 @@
 #ifndef PROJECT_CHATTY_H
 #define PROJECT_CHATTY_H
 
+/**
+ * to avoid warnings like "ISO C forbids an empty translation unit"
+ */
+typedef int make_iso_compilers_happy;
+
 #include <stdbool.h>
-#include <errno.h>
-#include <signal.h>
-#include <libconfig.h>
-
-#include "log.h"
-#include "stats.h"
-#include "config.h"
-#include "signal_handler.h"
-
-// structure that contains server configuration
-config_t server_conf;
 
 bool check_arguments(int, char**);
 bool parse_config(char*);

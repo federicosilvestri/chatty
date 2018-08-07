@@ -35,3 +35,24 @@ DirName          = "/tmp/chatty"
 
 # file nel quale verranno scritte le statistiche del server
 StatFileName     = "/tmp/chatty_stats.txt"
+
+#
+# RabbitMQ configuration
+#
+
+# Hostname, use IPv4 or machine hostname
+RabbitMQHostname = "127.0.0.1"
+
+# Port
+RabbitMQPort = 5672
+
+# RabbitMQ configuration
+# optional parameters
+#
+
+# Exchange string
+RabbitExchange = "test"
+
+# Binding Key
+RabbitBindKey = "
+
