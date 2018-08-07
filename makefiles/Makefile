@@ -79,7 +79,7 @@ INCLUDE_FILES   = connections.h \
 all		: $(TARGETS)
 
 
-chatty: chatty.o log.o signal_handler.o libchatty.a $(INCLUDE_FILES)
+chatty: chatty.o log.o config.o signal_handler.o libchatty.a $(INCLUDE_FILES)
 	$(CC) $(CFLAGS) $(INCLUDES) $(OPTFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 client: client.o connections.o message.h
