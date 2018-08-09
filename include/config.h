@@ -1,10 +1,11 @@
-/*
- * membox Progetto del corso di LSO 2017/2018
- *
- * Dipartimento di Informatica Università di Pisa
- * Docenti: Prencipe, Torquati
- * 
- */
+/*******************************************************************************
+ * SOL 2017/2018
+ * Chatty
+ * Federico Silvestri 559014
+ * Si dichiara che il contenuto di questo file e' in ogni sua parte opera
+ * originale dell'autore.
+ *******************************************************************************/
+
 /**
  * @file config.h
  * @brief File contenente alcune define con valori massimi utilizzabili
@@ -19,16 +20,6 @@
  * Max length of user name
  */
 #define MAX_NAME_LENGTH	32
-
-/**
- * Represents the string type of configuration parameter
- */
-#define CONF_STRING_T 0
-
-/**
- * Represents the integer type of configuration parameter
- */
-#define CONF_INT_T 1
 
 /**
  * @brief This function load into memory the file passed as configuration file.

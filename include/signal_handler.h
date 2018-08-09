@@ -1,9 +1,10 @@
-/*
- * signal_handler.h
- *
- *  Created on: Aug 4, 2018
- *      Author: federicosilvestri
- */
+/*******************************************************************************
+ * SOL 2017/2018
+ * Chatty
+ * Federico Silvestri 559014
+ * Si dichiara che il contenuto di questo file e' in ogni sua parte opera
+ * originale dell'autore.
+ *******************************************************************************/
 
 #ifndef SIGNAL_HANDLER_H_
 #define SIGNAL_HANDLER_H_

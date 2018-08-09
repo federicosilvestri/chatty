@@ -11,7 +11,8 @@
 # 
 FILE_DA_CONSEGNARE=Makefile chatty.c message.h ops.h stats.h config.h \
 		   DATA/chatty.conf1 DATA/chatty.conf2 connections.h \
-		   b.h b.c
+		   amqp_utils.c log.c server.c signal_handler.c \
+		   amqp_utils.h log.h server.h signal_handler.h
 # inserire il nome del tarball: es. NinoBixio
 TARNAME=FedericoSilvestri
 # inserire il corso di appartenenza: CorsoA oppure CorsoB
@@ -48,7 +49,7 @@ ARFLAGS         =  rvs
 INCLUDES	= -I.
 LDFLAGS 	= -L.
 OPTFLAGS	= #-O3 
-LIBS            = -pthread -lconfig
+LIBS            = -pthread -lconfig -lrabbitmq
 
 # aggiungere qui altri targets se necessario
 TARGETS		= chatty        \
@@ -64,7 +65,8 @@ INCLUDE_FILES   = connections.h \
 		  ops.h	  	\
 		  stats.h       \
 		  config.h	\
-		  signal_handler.h
+		  signal_handler.h \
+		  amqp_utils.h		\
 
 
 .PHONY: deps all clean cleanall test1 test2 test3 test4 test5 consegna
@@ -79,7 +81,7 @@ INCLUDE_FILES   = connections.h \
 all		: $(TARGETS)
 
 
-chatty: chatty.o log.o config.o signal_handler.o libchatty.a $(INCLUDE_FILES)
+chatty: chatty.o log.o config.o signal_handler.o server.o amqp_utils.o libchatty.a $(INCLUDE_FILES)
 	$(CC) $(CFLAGS) $(INCLUDES) $(OPTFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 client: client.o connections.o message.h

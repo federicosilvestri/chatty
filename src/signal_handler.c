@@ -1,14 +1,16 @@
-/*
- * signal_handler.c
- *
- *  Created on: Aug 4, 2018
- *      Author: federicosilvestri
- */
+/*******************************************************************************
+ * SOL 2017/2018
+ * Chatty
+ * Federico Silvestri 559014
+ * Si dichiara che il contenuto di questo file e' in ogni sua parte opera
+ * originale dell'autore.
+ *******************************************************************************/
 
 /**
  * @file signal_handler.h signal management header file.
  * @brief it manages all signals triggered by system.
  */
+
 #include "signal_handler.h"
 
 #include <stdio.h>

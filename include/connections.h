@@ -1,10 +1,10 @@
-/*
- * chatterbox Progetto del corso di LSO 2017/2018
- *
- * Dipartimento di Informatica Università di Pisa
- * Docenti: Prencipe, Torquati
- * 
- */
+/*******************************************************************************
+ * SOL 2017/2018
+ * Chatty
+ * Federico Silvestri 559014
+ * Si dichiara che il contenuto di questo file e' in ogni sua parte opera
+ * originale dell'autore.
+ *******************************************************************************/
 
 /**
  * @file  connections.h

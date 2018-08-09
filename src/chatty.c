@@ -1,10 +1,11 @@
-/*
- * membox Progetto del corso di LSO 2017/2018
- *
- * Dipartimento di Informatica Università di Pisa
- * Docenti: Prencipe, Torquati
- * 
- */
+/*******************************************************************************
+ * SOL 2017/2018
+ * Chatty
+ * Federico Silvestri 559014
+ * Si dichiara che il contenuto di questo file e' in ogni sua parte opera
+ * originale dell'autore.
+ *******************************************************************************/
+
 /**
  * @file chatty.c
  * @brief File principale del server chatterbox
@@ -70,7 +71,11 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	log_info("Welcome to chatty server!");
+	if (server_start() == false) {
+		log_error("Cannot start chatty server!");
+	} else {
+		log_info("Welcome to chatty server!");
+	}
 
 	log_debug("Cleaning up...");
 	clean_workspace();

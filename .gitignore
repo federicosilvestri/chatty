@@ -174,3 +174,4 @@ nbdist/
 .nb-gradle/
 
 /DebugClang/
+/TestDebug/

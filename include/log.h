@@ -1,9 +1,10 @@
-/**
- * Copyright (c) 2017 rxi
- *
- * This library is free software; you can redistribute it and/or modify it
- * under the terms of the MIT license. See `log.c` for details.
- */
+/*******************************************************************************
+ * SOL 2017/2018
+ * Chatty
+ * Federico Silvestri 559014
+ * Si dichiara che il contenuto di questo file e' in ogni sua parte opera
+ * originale dell'autore.
+ *******************************************************************************/
 
 #ifndef LOG_H
 #define LOG_H
