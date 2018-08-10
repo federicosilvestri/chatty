@@ -20,3 +20,8 @@ bool producer_start();
  * Destroy producer
  */
 void producer_destroy();
+
+/**
+ * Wait termination of thread.
+ */
+void producer_join();

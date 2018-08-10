@@ -32,6 +32,13 @@ amqp_connection_state_t p_conn;
 int p_status;
 
 /**
+ * This is the internal status variable.
+ * It must not be affected by concurrency race.
+ */
+static int status = SERVER_STATUS_STOPPED;
+
+
+/**
  * This function retrieves RabbitMQ parameters by server_conf
  * variable and store information on static variables.
  *
@@ -111,8 +118,12 @@ static bool rabmq_init() {
 	return true;
 }
 
-
 bool server_start() {
+	if (status == SERVER_STATUS_STOPPING || status == SERVER_STATUS_RUNNING) {
+		log_error("server_start call received multiple times!");
+		return false;
+	}
+
 	if (rabmq_init_params() == false) {
 		return false;
 	}
@@ -134,17 +145,58 @@ bool server_start() {
 		return false;
 	}
 
+	// update status
+	status = SERVER_STATUS_RUNNING;
+
 	return true;
 }
 
+static void rabbitmq_destroy() {
+	// close socket to rabbit
+	log_debug("Closing RabbitMQ connection");
+
+	amqp_check_error(amqp_connection_close(p_conn, AMQP_REPLY_SUCCESS),
+			"Cannot close connection to RabbitM");
+
+	// try to destroy (also if it isn't closed)
+
+	log_debug("Destroying RabbitMQ connection");
+	int c_destroy = amqp_destroy_connection(p_conn);
+
+	if (c_destroy < 0) {
+		log_error("Cannot destroy connection to RabbitMQ, %s",
+				amqp_error_string2(c_destroy));
+	}
+}
+
 bool server_stop() {
+	log_trace("server_stop execution");
+
+	if (status == SERVER_STATUS_STOPPING) {
+		log_error("server_stop call received multiple times!");
+		return false;
+	}
+
+	status = SERVER_STATUS_STOPPING;
+
 	// only temporary
 	producer_destroy();
 	// consumer_destroy();
+	rabbitmq_destroy();
 
+	// update status
+	status = SERVER_STATUS_STOPPED;
+
+	log_trace("server_stop executed");
 	return true;
 }
 
 int server_status() {
-	return SERVER_STATUS_STOPPED;
+	return status;
+}
+
+void server_join() {
+	// wait termination of consumer thread
+	producer_join();
+	// consumer_join();
 }

@@ -20,7 +20,7 @@
 /**
  * How many signals are registered.
  */
-#define SIG_HANDL_N 1
+#define SIG_HANDL_N 2
 
 /**
  * SIGPIPE signal code
@@ -30,7 +30,7 @@
 /**
  * SIGTERM signal code
  */
-#define SIG_HANDL_SIGTERM 1
+#define SIG_HANDL_SIGINT 1
 
 /**
  * SIGUSR1 signal code
@@ -65,6 +65,12 @@ bool signal_handler_register();
  * @brief this function manages the SIGPIPE signal.
  */
 void signal_handler_pipe();
+
+/**
+ * Handler for SIGINT
+ * @brief this function manages the SIGINT signal.
+ */
+void signal_handler_int();
 
 /**
  * Handler for SIGTERM.

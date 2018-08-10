@@ -23,11 +23,12 @@
 #include <errno.h>
 
 #include "log.h"
+#include "controller.h"
 
 /**
  * Registered signal to register to system
  */
-const int sig_handl_signals[] = { SIGPIPE };
+const int sig_handl_signals[] = { SIGPIPE, SIGINT };
 
 /**
  * Actions to perform when signal is triggered.
@@ -48,15 +49,17 @@ void signal_handler_init() {
 
 	}
 
-	// setting up SIG_PIPE
+	// Setting SIG_PIPE
 	sig_handl_acts[SIG_HANDL_SIGPIPE].sa_handler = signal_handler_pipe; // it can be replaced with SIG_IGN
 	sig_handl_acts[SIG_HANDL_SIGPIPE].sa_flags = SA_SIGINFO;
-	sig_handl_acts[SIG_HANDL_SIGTERM].sa_handler = signal_handler_term;
-	sig_handl_acts[SIG_HANDL_SIGUSR1].sa_handler = signal_handler_usr1;
+
+	// setting up SIG_INT
+	sig_handl_acts[SIG_HANDL_SIGINT].sa_handler = signal_handler_int;
+
+	sig_handl_acts[3].sa_handler = signal_handler_int;
 
 	init = true;
 }
-
 
 bool signal_handler_register() {
 	log_debug("Registering signal handler to system");
@@ -84,6 +87,24 @@ bool signal_handler_register() {
 
 void signal_handler_pipe() {
 	log_debug("Received SIGPIPE signal, ignoring it...");
+}
+
+void signal_handler_int() {
+	switch (server_status()) {
+	case SERVER_STATUS_RUNNING:
+		// stopping server
+		server_stop();
+		break;
+	case SERVER_STATUS_STOPPED:
+		log_warn("Server is already stopped.");
+		break;
+	case SERVER_STATUS_STOPPING:
+		log_info("One Moment! Stop command already received!");
+		break;
+	default:
+		log_debug("Received SIGINT signal, unknown server status.. %s",
+				"use \"pkill -9 chatty\" in case of emergency");
+	}
 }
 
 void signal_handler_term() {

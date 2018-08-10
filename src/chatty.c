@@ -75,10 +75,13 @@ int main(int argc, char *argv[]) {
 		log_error("Cannot start chatty server!");
 	} else {
 		log_info("Welcome to chatty server!");
-		sleep(100);
 	}
 
-	server_stop();
+	// while server is in running status
+	while (server_status() == SERVER_STATUS_RUNNING) {
+		// put server controller thread in wait queue
+		server_join();
+	}
 
 	log_debug("Cleaning up...");
 	clean_workspace();

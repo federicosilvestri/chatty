@@ -23,6 +23,11 @@
 #define SERVER_STATUS_STOPPED 1
 
 /**
+ * Constant to define that server is starting.
+ */
+#define SERVER_STATUS_STOPPING 2
+
+/**
  * Configuration variable are available externally.
  */
 extern config_t server_conf;
@@ -49,5 +54,10 @@ int server_status();
  * @return true on success, false on error
  */
 bool server_stop();
+
+/**
+ * This function puts the controller thread in wait status.
+ */
+void server_join();
 
 #endif /* SERVER_H_ */

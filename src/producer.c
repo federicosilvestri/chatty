@@ -5,6 +5,8 @@
  * Si dichiara che il contenuto di questo file e' in ogni sua parte opera
  * originale dell'autore.
  *******************************************************************************/
+#include "producer.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <memory.h>
@@ -19,10 +21,10 @@
 #include <amqp.h>
 #include <amqp_tcp_socket.h>
 
+#include "controller.h"
 #include "config.h"
 #include "log.h"
 #include "amqp_utils.h"
-#include "producer.h"
 
 static const char *socket_unix_path;
 static struct sockaddr_un listen_socket;
@@ -42,7 +44,7 @@ static bool producer_socket_init() {
 	if (config_lookup_string(&server_conf, "UnixPath",
 			&socket_unix_path) == CONFIG_FALSE) {
 		log_error(
-				"Programming error, assertion failed. Cannot Get UnixPath from configuration");
+				"Programming error, assertion failed. Cannot get UnixPath from configuration");
 		return false;
 	}
 
@@ -54,9 +56,17 @@ static bool producer_socket_init() {
 	}
 	strncpy(listen_socket.sun_path, socket_unix_path, 1 + unix_path_length);
 
+	int maxConnections;
+	if (config_lookup_int(&server_conf, "MaxConnections",
+			&maxConnections) == CONFIG_FALSE) {
+		log_error(
+				"Programming error, assertion failed. Cannot get MaxConnections from configuration)");
+		return false;
+	}
+
 	// Creating socket file descriptor
 	log_debug("Creating AF_UNIX socket...");
-	listen_socket_fd = socket(AF_UNIX, SOCK_RAW, 0);
+	listen_socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
 
 	if (listen_socket_fd < 0) {
 		log_error("Cannot create socket: %s", strerror(errno));
@@ -67,6 +77,12 @@ static bool producer_socket_init() {
 	if (bind(listen_socket_fd, (const struct sockaddr*) &listen_socket,
 			sizeof(listen_socket)) != 0) {
 		log_error("Cannot bind socket address!: %s", strerror(errno));
+		return false;
+	}
+
+	// listening
+	if (listen(listen_socket_fd, maxConnections) != 0) {
+		log_error("Cannot listen on socket: %s", strerror(errno));
 		return false;
 	}
 
@@ -93,17 +109,12 @@ bool producer_init() {
  * @param params parameters of standard routine thread
  */
 static void *producer_run(void* params) {
-	//	amqp_channel_open(p_conn, 1);
-	//	die_on_amqp_error(amqp_get_rpc_reply(p_conn), "Opening channel");
-	//
-	//	send_batch(p_conn, "test queue", p_rate_limit, p_message_count);
-	//
-	//	die_on_amqp_error(amqp_channel_close(p_conn, 1, AMQP_REPLY_SUCCESS),
-	//			"Closing channel");
+	log_debug("Producer is alive");
 
-	log_debug("Producer thread is now running with success");
-
-	sleep(10);
+	while (server_status() == SERVER_STATUS_RUNNING) {
+		log_warn("Non so che fare, sono in status di running...");
+		sleep(3);
+	}
 
 	log_debug("producer thread is now stopped.");
 
@@ -117,39 +128,32 @@ static void *producer_run(void* params) {
  */
 bool producer_start() {
 	// starting thread of producer
-	int t_status = pthread_create(&producer_thread, NULL, producer_run, NULL);
+	int t_status = pthread_create(&producer_thread, NULL, producer_run,
+	NULL);
 
 	if (t_status != 0) {
 		log_error("Cannot startup producer", strerror(errno));
 		return false;
 	}
 
+	log_debug("Producer started successfully");
+
 	return true;
 }
 
+void producer_join() {
+	// waiting termination of main thread
+	pthread_join(producer_thread, NULL);
+}
+
 void producer_destroy() {
-	// close socket to rabbit
-	log_debug("Closing RabbitMQ connection");
-
-//	amqp_check_error(amqp_connection_close(p_conn, AMQP_REPLY_SUCCESS),
-//			"Cannot close connection to RabbitM");
-
-	// try to destroy (also if it isn't closed)
-
-//	log_debug("Destroying RabbitMQ connection");
-//	int c_destroy = amqp_destroy_connection(p_conn);
-//
-//	if (c_destroy < 0) {
-//		log_error("Cannot destroy connection to RabbitMQ, %s",
-//				amqp_error_string2(c_destroy));
-//	}
-
 	log_debug("Closing listening socket");
 	// closing socket connection
 	if (close(listen_socket_fd) < 0) {
 		log_error("Cannot close listen socket file descriptor");
 	}
 
+	log_debug("Deleting socket file");
 	// deleting UNIX socket
 	if (unlink(socket_unix_path) != 0) {
 		log_error("Cannot delete Unix socket file");
