@@ -29,7 +29,7 @@
 #include "log.h"
 #include "stats.h"
 #include "config.h"
-#include "server.h"
+#include "controller.h"
 #include "signal_handler.h"
 
 #include "chatty.h"
@@ -75,7 +75,10 @@ int main(int argc, char *argv[]) {
 		log_error("Cannot start chatty server!");
 	} else {
 		log_info("Welcome to chatty server!");
+		sleep(100);
 	}
+
+	server_stop();
 
 	log_debug("Cleaning up...");
 	clean_workspace();

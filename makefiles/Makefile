@@ -11,8 +11,9 @@
 # 
 FILE_DA_CONSEGNARE=Makefile chatty.c message.h ops.h stats.h config.h \
 		   DATA/chatty.conf1 DATA/chatty.conf2 connections.h \
-		   amqp_utils.c log.c server.c signal_handler.c \
-		   amqp_utils.h log.h server.h signal_handler.h
+		   amqp_utils.c log.c controller.c signal_handler.c \
+		   amqp_utils.h log.h controller.h signal_handler.h \
+		   producer.h producer.c consumer.c consumer.h
 # inserire il nome del tarball: es. NinoBixio
 TARNAME=FedericoSilvestri
 # inserire il corso di appartenenza: CorsoA oppure CorsoB
@@ -57,7 +58,7 @@ TARGETS		= chatty        \
 
 
 # aggiungere qui i file oggetto da compilare
-OBJECTS		= 
+OBJECTS		= log.o config.o signal_handler.o controller.o producer.o amqp_utils.o
 
 # aggiungere qui gli altri include 
 INCLUDE_FILES   = connections.h \
@@ -67,8 +68,9 @@ INCLUDE_FILES   = connections.h \
 		  config.h	\
 		  signal_handler.h \
 		  amqp_utils.h		\
-
-
+		  controller.h		\
+		  producer.h		
+		  
 .PHONY: deps all clean cleanall test1 test2 test3 test4 test5 consegna
 .SUFFIXES: .c .h
 
@@ -80,8 +82,7 @@ INCLUDE_FILES   = connections.h \
 
 all		: $(TARGETS)
 
-
-chatty: chatty.o log.o config.o signal_handler.o server.o amqp_utils.o libchatty.a $(INCLUDE_FILES)
+chatty: chatty.o libchatty.a $(INCLUDE_FILES)
 	$(CC) $(CFLAGS) $(INCLUDES) $(OPTFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 client: client.o connections.o message.h
