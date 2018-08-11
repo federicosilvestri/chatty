@@ -5,6 +5,11 @@
  * Si dichiara che il contenuto di questo file e' in ogni sua parte opera
  * originale dell'autore.
  *******************************************************************************/
+/**
+ * C POSIX source definition.
+ */
+#define _POSIX_C_SOURCE 200809L
+
 #include "producer.h"
 
 #include <stdio.h>
@@ -12,6 +17,9 @@
 #include <memory.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <signal.h>
+#include <sys/select.h>
+#include <sys/time.h>
 #include <pthread.h>
 #include <sys/un.h>
 #include <string.h>
@@ -26,11 +34,17 @@
 #include "log.h"
 #include "amqp_utils.h"
 
+static int max_connections;
 static const char *socket_unix_path;
 static struct sockaddr_un listen_socket;
 static int listen_socket_fd;
+struct timeval select_intv = { 0, 1000 };
 
 static pthread_t producer_thread;
+
+extern int *sockets;
+static int socket_i;
+fd_set read_fds;
 
 /**
  * Socket creation and initialization.
@@ -56,9 +70,8 @@ static bool producer_socket_init() {
 	}
 	strncpy(listen_socket.sun_path, socket_unix_path, 1 + unix_path_length);
 
-	int maxConnections;
 	if (config_lookup_int(&server_conf, "MaxConnections",
-			&maxConnections) == CONFIG_FALSE) {
+			&max_connections) == CONFIG_FALSE) {
 		log_error(
 				"Programming error, assertion failed. Cannot get MaxConnections from configuration)");
 		return false;
@@ -73,6 +86,14 @@ static bool producer_socket_init() {
 		return false;
 	}
 
+	int opt = true;
+	// Handle multiple connections
+	if (setsockopt(listen_socket_fd, SOL_SOCKET, SO_REUSEADDR, (char *) &opt,
+			sizeof(opt)) < 0) {
+		log_error("Cannot change socket options: %s", strerror(errno));
+		return false;
+	}
+
 	// Binding
 	if (bind(listen_socket_fd, (const struct sockaddr*) &listen_socket,
 			sizeof(listen_socket)) != 0) {
@@ -81,10 +102,18 @@ static bool producer_socket_init() {
 	}
 
 	// listening
-	if (listen(listen_socket_fd, maxConnections) != 0) {
+	if (listen(listen_socket_fd, max_connections) != 0) {
 		log_error("Cannot listen on socket: %s", strerror(errno));
 		return false;
 	}
+
+	// initialize client socket
+	sockets = malloc(sizeof(int) * max_connections);
+	for (int i = 0; i < max_connections; i++) {
+		sockets[i] = 0;
+	}
+
+	socket_i = 0;
 
 	return true;
 }
@@ -102,6 +131,108 @@ bool producer_init() {
 }
 
 /**
+ * Get available index for socket.
+ *
+ * @return -1 if no available sockets index, else the index
+ */
+static inline int get_av_sock_index() {
+	int av = -1;
+
+	for (int i = 0; i < max_connections && av == -1; i++) {
+		if (sockets[i] == 0) {
+			av = i;
+		}
+	}
+
+	return av;
+}
+
+/**
+ * Initialize socket file descriptors.
+ *
+ * @return the maximum file descriptor
+ */
+static inline int run_init_socket_fds() {
+	FD_ZERO(&read_fds);
+	FD_SET(listen_socket_fd, &read_fds);
+
+	int max_sd = listen_socket_fd;
+
+	for (int i = 0; i < max_connections; i++) {
+		int sd = sockets[i];
+
+		// If valid socket descriptor then add to read list
+		if (sd > 0) {
+			FD_SET(sd, &read_fds);
+		}
+
+		// Highest file descriptor number, need it for the select function
+		if (sd > max_sd) {
+			max_sd = sd;
+		}
+	}
+
+	return max_sd;
+}
+
+/**
+ * Manage, if it is pending, new connection.
+ *
+ * @return true if connection is set up, false if not
+ */
+static inline bool run_manage_new_conn() {
+	if (FD_ISSET(listen_socket_fd, &read_fds)) {
+		int new_socket = accept(listen_socket_fd, NULL, 0);
+
+		if (new_socket < 0) {
+			log_error("Error during creating new socket: %s", strerror(errno));
+			return false; // do not exit, log error and try again
+		}
+
+		log_info("New connection , socket fd is %d", new_socket);
+
+		// add new socket to array of sockets using last index
+		int av = get_av_sock_index();
+		sockets[av] = new_socket;
+
+		return true;
+	}
+
+	return false;
+}
+
+/**
+ * Manage the active connection.
+ * If a message is in the queue, it will be sent to RabbitM (the consumer queue).
+ */
+static inline void run_manage_conn() {
+	for (int i = 0; i < max_connections; i++) {
+		int sd = sockets[i];
+
+		if (FD_ISSET(sd, &read_fds)) {
+			// check closed socket
+			int valread;
+			char buffer[1024];
+
+			if ((valread = read(sd, buffer, 1024)) == 0) {
+				log_info("Host disconnected");
+				close(sd);
+				sockets[i] = 0;
+			} else {
+				// pending operation
+			}
+		}
+	}
+}
+
+/**
+ * Handler for producer thread.
+ */
+//static void run_sig_handler() {
+//	log_trace("SIGNAL HANDLER HIT");
+//}
+
+/**
  *
  * This function is the thread function that is executed
  * by producer thread,
@@ -111,10 +242,42 @@ bool producer_init() {
 static void *producer_run(void* params) {
 	log_debug("Producer is alive");
 
+	// setting up signal handler, if necessary
+//	struct sigaction sig_handl;
+//	memset(&sig_handl, 0, sizeof(struct sigaction));
+//	sig_handl.sa_handler = run_sig_handler;
+//	sigaction(SIGTERM, &sig_handl, NULL);
+
 	while (server_status() == SERVER_STATUS_RUNNING) {
-		log_warn("Non so che fare, sono in status di running...");
-		sleep(3);
+		// initialize sets and get max fds
+		int max_sd = run_init_socket_fds();
+
+		/*
+		 * Select execution:
+		 * writefs and exceptfs are NULL
+		 */
+		int activity = select(max_sd + 1, &read_fds, NULL, NULL, NULL);
+
+		if (activity == -1) {
+			// this is not a big problem
+			log_debug("Producer selected failed");
+			continue;
+		}
+
+		// check if there are new pending connections
+		if (!run_manage_new_conn()) {
+			// if no connection are discovered, manage the active
+			run_manage_conn();
+		}
+
+		/*
+		 *  end cycle, re-execute intialization and check,
+		 *  as documented in POSIX select manual.
+		 */
 	}
+
+	// cleanup read fds
+	FD_ZERO(&read_fds);
 
 	log_debug("producer thread is now stopped.");
 
@@ -147,6 +310,11 @@ void producer_join() {
 }
 
 void producer_destroy() {
+	// send 'stop' signal to select
+	if (pthread_kill(producer_thread, SIGTERM) != 0) {
+		log_warn("Can't send signal to producer thread, is thread still active?");
+	}
+
 	log_debug("Closing listening socket");
 	// closing socket connection
 	if (close(listen_socket_fd) < 0) {
@@ -158,4 +326,8 @@ void producer_destroy() {
 	if (unlink(socket_unix_path) != 0) {
 		log_error("Cannot delete Unix socket file");
 	}
+
+	// Destroying sockets
+	log_debug("Destroying sockets array");
+	free(sockets);
 }

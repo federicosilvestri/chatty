@@ -11,6 +11,11 @@
  * @brief it manages all signals triggered by system.
  */
 
+/**
+ * Define Posix Source
+ */
+#define _POSIX_C_SOURCE 200809L
+
 #include "signal_handler.h"
 
 #include <stdio.h>

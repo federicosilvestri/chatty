@@ -1,0 +1,20 @@
+Il server principalmente è stato pensato per essere utilizzato
+con il support di RabbitMQ.
+
+Si divide in tre parti fondamentali che sono:
+	1. Controller
+	2. Producer
+	3. Consumer
+
+Il controller è la parte del software che viene eseguita quando si verificano degli eventi,
+come per esempio l'avvio, la ricezione di un segnale dall'esterno, etc..
+
+Il controller è il thread principale del processo, e viene messo in attesa
+quando non c'è niente da fare, esso si occupa dello spawn del thread producer e del threadpool dei consumer.
+
+La scelta di usare un thread dedicato al controller è la seguente:
+se venisse lanciato un segnale al processo principale, il thread consumer si interromperebbe,
+e dunque le nuove connessioni sarebbero messe in attesa.
+
+Utilizzando invece un thread separato i segnali una volta ricevuti vanno ad attivare il thread principale, ed esso
+si occuperà di gestirli senza dover interrompere le connessioni in entrata.

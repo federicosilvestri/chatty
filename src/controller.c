@@ -5,6 +5,10 @@
  * Si dichiara che il contenuto di questo file e' in ogni sua parte opera
  * originale dell'autore.
  *******************************************************************************/
+/**
+ * C POSIX source definition.
+ */
+#define _POSIX_C_SOURCE 200809L
 
 #include "controller.h"
 
@@ -30,6 +34,8 @@ int rabmq_port;
 amqp_socket_t *p_socket = NULL;
 amqp_connection_state_t p_conn;
 int p_status;
+
+int *sockets;
 
 /**
  * This is the internal status variable.
@@ -178,6 +184,7 @@ bool server_stop() {
 	}
 
 	status = SERVER_STATUS_STOPPING;
+	log_trace("Waiting for producer to finish...");
 
 	// only temporary
 	producer_destroy();
@@ -187,7 +194,8 @@ bool server_stop() {
 	// update status
 	status = SERVER_STATUS_STOPPED;
 
-	log_trace("server_stop executed");
+	log_trace("server_stop executed.");
+
 	return true;
 }
 
