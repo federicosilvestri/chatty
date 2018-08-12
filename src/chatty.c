@@ -30,7 +30,7 @@
 #include "stats.h"
 #include "config.h"
 #include "controller.h"
-#include "signal_handler.h"
+#include "signal_manager.h"
 
 #include "chatty.h"
 
@@ -63,27 +63,50 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	// send initialization to signal handler
-	signal_handler_init();
-
-	if (signal_handler_register() == false) {
-		clean_workspace();
+	// try to register signals
+	if (signal_manager_register() == false) {
+		log_error("Cannot register signal manager!");
 		return 1;
 	}
 
 	if (server_start() == false) {
-		log_error("Cannot start chatty server!");
+		log_fatal("Cannot start chatty server!");
 	} else {
 		log_info("Welcome to chatty server!");
 	}
 
-	// while server is in running status
+	log_debug("Server PID: %d", getpid());
+
+	/*
+	 * One time that server is started, while server is in
+	 * running status, we can wait for incoming signals.
+	 */
 	while (server_status() == SERVER_STATUS_RUNNING) {
-		// put server controller thread in wait queue
-		server_join();
+		log_trace("MAIN THREAD: waiting for server to finish");
+		int action = signal_manager_wait();
+		log_warn("woke up from sleeping with signal %d", action);
+
+		switch (action) {
+		case SIGINT:
+		case SIGQUIT:
+			log_info("Received SIGQUIT, quitting...");
+			server_stop();
+			break;
+		case SIGUSR1:
+			log_info("Printing statistics...");
+			// print statistics
+			break;
+		default:
+			// wait other signal
+			break;
+
+		}
 	}
 
+	log_debug("Waiting termination of server...");
+	server_wait();
 	log_debug("Cleaning up...");
+	server_destroy();
 	clean_workspace();
 	log_info("Goodbye by chatty server!");
 

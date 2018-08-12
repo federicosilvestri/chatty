@@ -38,13 +38,14 @@ static int max_connections;
 static const char *socket_unix_path;
 static struct sockaddr_un listen_socket;
 static int listen_socket_fd;
-struct timeval select_intv = { 0, 1000 };
+static const struct timespec select_intv = { 0, 500 };
 
 static pthread_t producer_thread;
 
 extern int *sockets;
-static int socket_i;
 fd_set read_fds;
+
+extern amqp_connection_state_t p_conn;
 
 /**
  * Socket creation and initialization.
@@ -112,8 +113,6 @@ static bool producer_socket_init() {
 	for (int i = 0; i < max_connections; i++) {
 		sockets[i] = 0;
 	}
-
-	socket_i = 0;
 
 	return true;
 }
@@ -220,17 +219,28 @@ static inline void run_manage_conn() {
 				sockets[i] = 0;
 			} else {
 				// pending operation
+				// put into queue
+
 			}
 		}
 	}
 }
 
-/**
- * Handler for producer thread.
- */
-//static void run_sig_handler() {
-//	log_trace("SIGNAL HANDLER HIT");
-//}
+static inline void run_cleanup() {
+	// cleanup read fds
+	FD_ZERO(&read_fds);
+
+	// close channel
+	amqp_channel_close(p_conn, 1, AMQP_REPLY_SUCCESS);
+	amqp_check_error(amqp_get_rpc_reply(p_conn), "Producer opening channel");
+
+	// closing active sockets
+	for (int i = 0; i < max_connections; i++) {
+		if (sockets[i] > 0) {
+			close(sockets[i]);
+		}
+	}
+}
 
 /**
  *
@@ -242,11 +252,19 @@ static inline void run_manage_conn() {
 static void *producer_run(void* params) {
 	log_debug("Producer is alive");
 
-	// setting up signal handler, if necessary
-//	struct sigaction sig_handl;
-//	memset(&sig_handl, 0, sizeof(struct sigaction));
-//	sig_handl.sa_handler = run_sig_handler;
-//	sigaction(SIGTERM, &sig_handl, NULL);
+	// set blocking signals for select
+	sigset_t s_sigset;
+	sigemptyset(&s_sigset);
+	sigaddset(&s_sigset, SIGINT);
+	sigprocmask(SIG_BLOCK, &s_sigset, NULL);
+
+//	// open channel to rabbit
+	amqp_channel_open(p_conn, 1);
+	if (amqp_check_error(amqp_get_rpc_reply(p_conn),
+			"Producer opening channel") == true) {
+		log_fatal("Cannot start producer");
+		pthread_exit(NULL);
+	}
 
 	while (server_status() == SERVER_STATUS_RUNNING) {
 		// initialize sets and get max fds
@@ -256,7 +274,8 @@ static void *producer_run(void* params) {
 		 * Select execution:
 		 * writefs and exceptfs are NULL
 		 */
-		int activity = select(max_sd + 1, &read_fds, NULL, NULL, NULL);
+		int activity = pselect(max_sd + 1, &read_fds, NULL, NULL, &select_intv,
+				&s_sigset);
 
 		if (activity == -1) {
 			// this is not a big problem
@@ -276,11 +295,10 @@ static void *producer_run(void* params) {
 		 */
 	}
 
-	// cleanup read fds
-	FD_ZERO(&read_fds);
-
+	run_cleanup();
 	log_debug("producer thread is now stopped.");
 
+	pthread_exit(NULL);
 	return NULL;
 }
 
@@ -304,16 +322,15 @@ bool producer_start() {
 	return true;
 }
 
-void producer_join() {
+void producer_wait() {
 	// waiting termination of main thread
 	pthread_join(producer_thread, NULL);
+
 }
 
 void producer_destroy() {
-	// send 'stop' signal to select
-	if (pthread_kill(producer_thread, SIGTERM) != 0) {
-		log_warn("Can't send signal to producer thread, is thread still active?");
-	}
+	// wait until man thread is not terminated
+	log_debug("Destroying producer");
 
 	log_debug("Closing listening socket");
 	// closing socket connection

@@ -43,7 +43,6 @@ int *sockets;
  */
 static int status = SERVER_STATUS_STOPPED;
 
-
 /**
  * This function retrieves RabbitMQ parameters by server_conf
  * variable and store information on static variables.
@@ -179,17 +178,9 @@ bool server_stop() {
 	log_trace("server_stop execution");
 
 	if (status == SERVER_STATUS_STOPPING) {
-		log_error("server_stop call received multiple times!");
+		log_warn("server_stop call received multiple times!");
 		return false;
 	}
-
-	status = SERVER_STATUS_STOPPING;
-	log_trace("Waiting for producer to finish...");
-
-	// only temporary
-	producer_destroy();
-	// consumer_destroy();
-	rabbitmq_destroy();
 
 	// update status
 	status = SERVER_STATUS_STOPPED;
@@ -203,8 +194,19 @@ int server_status() {
 	return status;
 }
 
-void server_join() {
+void server_wait() {
 	// wait termination of consumer thread
-	producer_join();
+	producer_wait();
 	// consumer_join();
+}
+
+void server_destroy() {
+	// consumer_destroy();
+	rabbitmq_destroy();
+
+	// producer
+	producer_destroy();
+
+	// consumer
+	// consumer_destroy();
 }

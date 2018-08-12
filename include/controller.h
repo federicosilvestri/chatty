@@ -58,6 +58,11 @@ bool server_stop();
 /**
  * This function puts the controller thread in wait status.
  */
-void server_join();
+void server_wait();
+
+/**
+ * Destroy the server.
+ */
+void server_destroy();
 
 #endif /* SERVER_H_ */

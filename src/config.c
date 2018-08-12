@@ -31,9 +31,11 @@ static const char *config_req_params[] = { "UnixPath", "MaxConnections",
 /**
  * Configuration required parameters type
  */
-static const char config_req_params_type[] = { CONFIG_TYPE_STRING, CONFIG_TYPE_INT,
-CONFIG_TYPE_INT, CONFIG_TYPE_INT, CONFIG_TYPE_INT, CONFIG_TYPE_INT, CONFIG_TYPE_STRING,
-CONFIG_TYPE_STRING, CONFIG_TYPE_STRING, CONFIG_TYPE_INT };
+static const char config_req_params_type[] = { CONFIG_TYPE_STRING,
+		CONFIG_TYPE_INT,
+		CONFIG_TYPE_INT, CONFIG_TYPE_INT, CONFIG_TYPE_INT, CONFIG_TYPE_INT,
+		CONFIG_TYPE_STRING,
+		CONFIG_TYPE_STRING, CONFIG_TYPE_STRING, CONFIG_TYPE_INT };
 
 /**
  * Configuration optional parameters path
@@ -44,7 +46,8 @@ static const char *config_opt_params[] =
 /**
  * Configuration optional parameters type
  */
-static const char config_opt_params_type[] = { CONFIG_TYPE_STRING, CONFIG_TYPE_STRING };
+static const char config_opt_params_type[] = { CONFIG_TYPE_STRING,
+		CONFIG_TYPE_STRING };
 
 /**
  * Configuration optional parameters default value
@@ -79,7 +82,7 @@ static void config_load_default(int i, char type) {
 	root = config_root_setting(&server_conf);
 	added = config_setting_add(root, config_opt_params[i], type);
 
-	switch(type) {
+	switch (type) {
 	case CONFIG_TYPE_STRING:
 		config_setting_set_string(added, config_opt_params_default_value[i]);
 		break;
