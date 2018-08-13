@@ -11,11 +11,11 @@
 
 #include <stdio.h>
 #include <stdarg.h>
+#include <stdbool.h>
 
-#define LOG_VERSION "0.1.0"
-
-typedef void (*log_LockFn)(void *udata, int lock);
-
+/**
+ * LOG level types.
+ */
 enum { LOG_TRACE, LOG_DEBUG, LOG_INFO, LOG_WARN, LOG_ERROR, LOG_FATAL };
 
 #define log_trace(...) log_log(LOG_TRACE, __FILE__, __LINE__, __VA_ARGS__)
@@ -25,12 +25,36 @@ enum { LOG_TRACE, LOG_DEBUG, LOG_INFO, LOG_WARN, LOG_ERROR, LOG_FATAL };
 #define log_error(...) log_log(LOG_ERROR, __FILE__, __LINE__, __VA_ARGS__)
 #define log_fatal(...) log_log(LOG_FATAL, __FILE__, __LINE__, __VA_ARGS__)
 
-void log_set_udata(void *udata);
-void log_set_lock(log_LockFn fn);
+/**
+ * Initialize internal library objects.
+ */
+void log_init();
+
+/**
+ * Setup a file point where write logs.
+ *
+ * @param fp file pointer
+ */
 void log_set_fp(FILE *fp);
+
+/**
+ * Set the level you want to log.
+ * @param level a valid log level {LOG_TRACE, LOG_DEBUG, ...}
+ */
 void log_set_level(int level);
-void log_set_quiet(int enable);
+
+/**
+ * Enable quiet mode.
+ *
+ * @param enable true or false
+ */
+void log_set_quiet(bool enable);
 
 void log_log(int level, const char *file, int line, const char *fmt, ...);
+
+/**
+ * Delete internal objects and free memory.
+ */
+void log_destroy();
 
 #endif

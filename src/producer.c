@@ -45,7 +45,8 @@ static pthread_t producer_thread;
 extern int *sockets;
 fd_set read_fds;
 
-extern amqp_connection_state_t p_conn;
+static amqp_socket_t *p_socket = NULL;
+static amqp_connection_state_t p_conn;
 
 /**
  * Socket creation and initialization.
@@ -123,6 +124,10 @@ static bool producer_socket_init() {
  */
 bool producer_init() {
 	if (!producer_socket_init()) {
+		return false;
+	}
+
+	if (!rabmq_init(&p_socket, &p_conn)) {
 		return false;
 	}
 
@@ -220,12 +225,24 @@ static inline void run_manage_conn() {
 			} else {
 				// pending operation
 				// put into queue
+				log_trace("received a message!");
+				amqp_bytes_t message_bytes;
+
+				message_bytes.len = sizeof(int);
+				message_bytes.bytes = &i;
+
+				amqp_basic_publish(p_conn, 1, amqp_cstring_bytes("amq.direct"),
+						amqp_cstring_bytes("test-queue"), 0, 0, NULL,
+						message_bytes);
 
 			}
 		}
 	}
 }
 
+/**
+ * Clean up workspace set up by producer run thread.
+ */
 static inline void run_cleanup() {
 	// cleanup read fds
 	FD_ZERO(&read_fds);
@@ -299,7 +316,6 @@ static void *producer_run(void* params) {
 	log_debug("producer thread is now stopped.");
 
 	pthread_exit(NULL);
-	return NULL;
 }
 
 /**
@@ -343,6 +359,10 @@ void producer_destroy() {
 	if (unlink(socket_unix_path) != 0) {
 		log_error("Cannot delete Unix socket file");
 	}
+
+	// Destroy RabbitMQ connection
+	log_debug("Destroying RabbitMQ connection");
+	rabmq_destroy(&p_conn);
 
 	// Destroying sockets
 	log_debug("Destroying sockets array");

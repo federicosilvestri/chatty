@@ -6,20 +6,27 @@
  * originale dell'autore.
  *******************************************************************************/
 
+/**
+ * Define Posix Source
+ */
+#define _POSIX_C_SOURCE 200809L
+
+#include "log.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <pthread.h>
 #include <time.h>
 
-#include "log.h"
+static bool initialized = false;
 
 static struct {
-	void *udata;
-	log_LockFn lock;
+	pthread_mutex_t lock;
 	FILE *fp;
 	int level;
-	int quiet;
+	bool quiet;
 } L;
 
 static const char *level_names[] = { "TRACE", "DEBUG", "INFO", "WARN", "ERROR",
@@ -28,24 +35,13 @@ static const char *level_names[] = { "TRACE", "DEBUG", "INFO", "WARN", "ERROR",
 static const char *level_colors[] = { "\x1b[94m", "\x1b[36m", "\x1b[32m",
 		"\x1b[33m", "\x1b[31m", "\x1b[35m" };
 
-static void lock(void) {
-	if (L.lock) {
-		L.lock(L.udata, 1);
+void log_init() {
+	if (initialized == true) {
+		return;
 	}
-}
+	initialized = true;
 
-static void unlock(void) {
-	if (L.lock) {
-		L.lock(L.udata, 0);
-	}
-}
-
-void log_set_udata(void *udata) {
-	L.udata = udata;
-}
-
-void log_set_lock(log_LockFn fn) {
-	L.lock = fn;
+	pthread_mutex_init(&L.lock, NULL);
 }
 
 void log_set_fp(FILE *fp) {
@@ -56,23 +52,23 @@ void log_set_level(int level) {
 	L.level = level;
 }
 
-void log_set_quiet(int enable) {
-	L.quiet = enable ? 1 : 0;
+void log_set_quiet(bool enable) {
+	L.quiet = enable;
 }
 
 void log_log(int level, const char *file, int line, const char *fmt, ...) {
-	if (level < L.level) {
+	if (level < L.level || initialized == false) {
 		return;
 	}
 
-	/* Acquire lock */
-	lock();
+	// Acquire lock
+	pthread_mutex_lock(&L.lock);
 
-	/* Get current time */
+	// Get current time
 	time_t t = time(NULL);
 	struct tm *lt = localtime(&t);
 
-	/* Log to stderr */
+	// Log to sterr
 	if (!L.quiet) {
 		va_list args;
 		char buf[16];
@@ -87,7 +83,7 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
 		fflush(stderr);
 	}
 
-	/* Log to file */
+	// Log to file
 	if (L.fp) {
 		va_list args;
 		char buf[32];
@@ -100,6 +96,10 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
 		fflush(L.fp);
 	}
 
-	/* Release lock */
-	unlock();
+	// Release lock
+	pthread_mutex_unlock(&L.lock);
+}
+
+void log_destroy() {
+	pthread_mutex_destroy(&L.lock);
 }

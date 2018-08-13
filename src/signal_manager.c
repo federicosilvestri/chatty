@@ -30,12 +30,7 @@
 
 #include "log.h"
 
-/**
- * Define how many signals you want to register.
- */
-#define SIG_HANDL_N 4
-
-static const int signals[] = { SIGPIPE, SIGINT, SIGQUIT, SIGUSR1 };
+static const int signals[] = { SIGPIPE, SIGINT, SIGUSR1 };
 
 /**
  * Registered signal to register to system
@@ -62,7 +57,7 @@ bool signal_manager_register() {
 	}
 
 	// adding signals
-	for (int i = 0; i < SIG_HANDL_N; i++) {
+	for (int i = 0; i < sizeof(signals) / sizeof(const int); i++) {
 		if (sigaddset(&signal_set, signals[i]) == -1) {
 			log_fatal("Cannot add signal to signals set");
 			return false;
@@ -71,8 +66,6 @@ bool signal_manager_register() {
 
 	// setting block signal
 	sigprocmask(SIG_BLOCK, &signal_set, &old_signal_set);
-
-	// registering
 
 	init = true;
 	return true;

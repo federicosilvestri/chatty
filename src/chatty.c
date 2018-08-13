@@ -55,6 +55,8 @@ static void usage(const char *progname) {
  * @return program exit code.
  */
 int main(int argc, char *argv[]) {
+	log_init();
+
 	if (check_arguments(argc, argv) == false) {
 		return 1;
 	}
@@ -66,15 +68,17 @@ int main(int argc, char *argv[]) {
 	// try to register signals
 	if (signal_manager_register() == false) {
 		log_error("Cannot register signal manager!");
+		clean_workspace();
 		return 1;
 	}
 
 	if (server_start() == false) {
 		log_fatal("Cannot start chatty server!");
-	} else {
-		log_info("Welcome to chatty server!");
+		clean_workspace();
+		return 1;
 	}
 
+	log_info("Welcome to chatty server!");
 	log_debug("Server PID: %d", getpid());
 
 	/*
@@ -137,4 +141,5 @@ bool check_arguments(int argc, char *argv[]) {
 
 void clean_workspace() {
 	config_clean();
+	log_destroy();
 }

@@ -58,7 +58,7 @@ TARGETS		= chatty        \
 
 
 # aggiungere qui i file oggetto da compilare
-OBJECTS		= log.o config.o signal_manager.o controller.o producer.o amqp_utils.o
+OBJECTS		= log.o config.o signal_manager.o controller.o producer.o consumer.o amqp_utils.o
 
 # aggiungere qui gli altri include 
 INCLUDE_FILES   = connections.h \

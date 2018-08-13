@@ -11,11 +11,125 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include <libconfig.h>
 #include <stdint.h>
+#include <amqp.h>
+#include <amqp_tcp_socket.h>
 
 #include "log.h"
 #include "amqp_utils.h"
+
+extern config_t server_conf;
+
+static bool initialized = false;
+
+static const char *rabmq_hostname;
+static const char *rabmq_exchange;
+static const char *rabmq_bindkey;
+static int rabmq_port;
+static int p_status;
+
+/**
+ * This function retrieves RabbitMQ parameters by server_conf
+ * variable and store information on static variables.
+ *
+ * @brief rabbit parameters initialization
+ * @return true on success, false on error
+ */
+bool rabmq_init_params() {
+	// fetching parameters from master
+	if (config_lookup_string(&server_conf, "RabbitMQHostname",
+			&rabmq_hostname) == CONFIG_FALSE) {
+		log_error("Cannot get RabbitMQHostname parameter");
+		return false;
+	}
+
+	if (config_lookup_int(&server_conf, "RabbitMQPort",
+			&rabmq_port) == CONFIG_FALSE) {
+		log_error("Cannot get RabbitMQPort parameter");
+		return false;
+	}
+
+	if (config_lookup_string(&server_conf, "RabbitMQExchange",
+			&rabmq_exchange) == CONFIG_FALSE) {
+		log_error(
+				"Cannot get RabbitMQExchange. Check if default value is valid.");
+		return false;
+
+	}
+
+	if (config_lookup_string(&server_conf, "RabbitMQBindKey",
+			&rabmq_bindkey) == CONFIG_FALSE) {
+		log_error(
+				"Cannot get RabbitMQBindKey. Check if default value is valid.");
+		return false;
+
+	}
+
+	log_debug("Loaded params for RMQ: [ %s, %d, %s, %s] ", rabmq_hostname,
+			rabmq_port, rabmq_exchange, rabmq_bindkey);
+
+	initialized = true;
+	return true;
+}
+
+
+bool rabmq_init(amqp_socket_t **socket, amqp_connection_state_t *conn) {
+	if (!initialized) {
+		log_fatal("RabbitMQ configuration parameters are not initialized.");
+		return false;
+	}
+
+	// connect to rabbit
+	log_debug("Creating production amqp connection");
+
+	*conn = amqp_new_connection();
+
+	*socket = amqp_tcp_socket_new(*conn);
+	if (!*socket) {
+		// destroy socket
+		amqp_destroy_connection(*conn);
+		log_error("creating TCP socket");
+		return false;
+	}
+
+	p_status = amqp_socket_open(*socket, rabmq_hostname, rabmq_port);
+	if (p_status) {
+		amqp_destroy_connection(*conn);
+		log_error("opening TCP socket");
+		return false;
+	}
+
+	bool conn_error = amqp_check_error(
+			amqp_login(*conn, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN,
+					"guest", "guest"), "Can't connect to RabbitMQ");
+
+	if (conn_error) {
+		amqp_destroy_connection(*conn);
+		log_error("Cannot start server due to previous error");
+		return false;
+	}
+
+	return true;
+}
+
+void rabmq_destroy(amqp_connection_state_t *conn) {
+	// close socket to rabbit
+	log_debug("Closing RabbitMQ connection");
+
+	amqp_check_error(amqp_connection_close(*conn, AMQP_REPLY_SUCCESS),
+			"Cannot close connection to RabbitM");
+
+	// try to destroy (also if it isn't closed)
+
+	log_debug("Destroying RabbitMQ connection");
+	int c_destroy = amqp_destroy_connection(*conn);
+
+	if (c_destroy < 0) {
+		log_error("Cannot destroy connection to RabbitMQ, %s",
+				amqp_error_string2(c_destroy));
+	}
+}
 
 bool amqp_check_error(amqp_rpc_reply_t x, char const *context) {
 	switch (x.reply_type) {

@@ -32,6 +32,7 @@
  */
 extern config_t server_conf;
 
+
 /**
  * This function starts the chatty server, using all
  * parameters given in server_conf.

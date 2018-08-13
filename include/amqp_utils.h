@@ -13,6 +13,15 @@
 #include <amqp.h>
 
 /**
+ * This function retrieves RabbitMQ parameters by server_conf
+ * variable and store information on static variables.
+ *
+ * @brief rabbit parameters initialization
+ * @return true on success, false on error
+ */
+bool rabmq_init_params();
+
+/**
  * This function checks if a specific family of rabbitmq-lib
  * functions return an error or not.
  *
@@ -20,10 +29,25 @@
  * @param context context to print in case of error
  * @return false if functions return does not throw an error, true otherwise
  */
-extern bool amqp_check_error(amqp_rpc_reply_t x, char const *context);
+bool amqp_check_error(amqp_rpc_reply_t x, char const *context);
 
-extern void amqp_dump(void const *buffer, size_t len);
-extern uint64_t now_microseconds(void);
-extern void microsleep(int usec);
+/**
+ * Initialize RabbitMQ connection state and socket.
+ *
+ * @param socket socket of rabbit
+ * @param conn connection of rabbit
+ * @return true on success, false on error
+ */
+bool rabmq_init(amqp_socket_t **socket, amqp_connection_state_t *conn);
+
+/**
+ * Destroy connection and socket to RabbitMQ.
+ *
+ * @param socket socket to destroy
+ * @param conn connection to destroy
+ */
+void rabmq_destroy(amqp_connection_state_t *conn);
+
+void amqp_dump(void const *buffer, size_t len);
 
 #endif /* AMQP_UTILS_H_ */
