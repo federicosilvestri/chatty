@@ -73,15 +73,11 @@ bool rabmq_init_params() {
 	return true;
 }
 
-
 bool rabmq_init(amqp_socket_t **socket, amqp_connection_state_t *conn) {
 	if (!initialized) {
 		log_fatal("RabbitMQ configuration parameters are not initialized.");
 		return false;
 	}
-
-	// connect to rabbit
-	log_debug("Creating production amqp connection");
 
 	*conn = amqp_new_connection();
 

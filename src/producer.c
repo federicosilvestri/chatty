@@ -70,6 +70,13 @@ static bool producer_socket_init() {
 				"Length of 'UnixPath' parameter is greater than 107 character.");
 		return false;
 	}
+
+	// check if file already exists
+	if (access(socket_unix_path, F_OK) == 0) {
+		log_error("Socket already exists! Is chatty running?");
+		return false;
+	}
+
 	strncpy(listen_socket.sun_path, socket_unix_path, 1 + unix_path_length);
 
 	if (config_lookup_int(&server_conf, "MaxConnections",
@@ -267,7 +274,7 @@ static inline void run_cleanup() {
  * @param params parameters of standard routine thread
  */
 static void *producer_run(void* params) {
-	log_debug("Producer is alive");
+	log_debug("[PRODUCER THREAD] started");
 
 	// set blocking signals for select
 	sigset_t s_sigset;
@@ -313,7 +320,7 @@ static void *producer_run(void* params) {
 	}
 
 	run_cleanup();
-	log_debug("producer thread is now stopped.");
+	log_debug("[PRODUCER THREAD] is now stopped.");
 
 	pthread_exit(NULL);
 }
@@ -341,7 +348,6 @@ bool producer_start() {
 void producer_wait() {
 	// waiting termination of main thread
 	pthread_join(producer_thread, NULL);
-
 }
 
 void producer_destroy() {

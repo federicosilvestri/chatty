@@ -74,7 +74,7 @@ static void *consumer_run(void *index_addr) {
 		pthread_exit(NULL);
 	}
 
-	log_debug("Thread %d started", id);
+	log_debug("[CONSUMER THREAD %d] started", id);
 
 	// open rabbit channel
 	amqp_channel_open(c_conn, 1);
@@ -96,7 +96,7 @@ static void *consumer_run(void *index_addr) {
 	// destroying connection
 	rabmq_destroy(&c_conn);
 
-	log_debug("Thread %d stopped", id);
+	log_debug("[CONSUMER THREAD %d] finished", id);
 	pthread_exit(NULL);
 }
 

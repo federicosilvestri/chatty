@@ -32,6 +32,14 @@
  */
 extern config_t server_conf;
 
+/**
+ * Initialize and check if server can be started or not.
+ * For example if the current AF_UNIX socket file exists,
+ * the result of this function will be false.
+ *
+ * @return true if yes, false if no
+ */
+bool server_init();
 
 /**
  * This function starts the chatty server, using all

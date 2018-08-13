@@ -35,9 +35,8 @@ int *sockets;
  */
 static int status = SERVER_STATUS_STOPPED;
 
-bool server_start() {
-	if (status == SERVER_STATUS_STOPPING || status == SERVER_STATUS_RUNNING) {
-		log_error("server_start call received multiple times!");
+bool server_init() {
+	if (status != SERVER_STATUS_STOPPED) {
 		return false;
 	}
 
@@ -46,12 +45,19 @@ bool server_start() {
 	}
 
 	if (producer_init() == false) {
-		producer_destroy();
 		return false;
 	}
 
 	if (consumer_init() == false) {
-		producer_destroy();
+		return false;
+	}
+
+	return true;
+}
+
+bool server_start() {
+	if (status == SERVER_STATUS_STOPPING || status == SERVER_STATUS_RUNNING) {
+		log_error("server_start call received multiple times!");
 		return false;
 	}
 

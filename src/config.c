@@ -32,10 +32,10 @@ static const char *config_req_params[] = { "UnixPath", "MaxConnections",
  * Configuration required parameters type
  */
 static const char config_req_params_type[] = { CONFIG_TYPE_STRING,
-		CONFIG_TYPE_INT,
-		CONFIG_TYPE_INT, CONFIG_TYPE_INT, CONFIG_TYPE_INT, CONFIG_TYPE_INT,
-		CONFIG_TYPE_STRING,
-		CONFIG_TYPE_STRING, CONFIG_TYPE_STRING, CONFIG_TYPE_INT };
+CONFIG_TYPE_INT,
+CONFIG_TYPE_INT, CONFIG_TYPE_INT, CONFIG_TYPE_INT, CONFIG_TYPE_INT,
+CONFIG_TYPE_STRING,
+CONFIG_TYPE_STRING, CONFIG_TYPE_STRING, CONFIG_TYPE_INT };
 
 /**
  * Configuration optional parameters path
@@ -47,7 +47,7 @@ static const char *config_opt_params[] =
  * Configuration optional parameters type
  */
 static const char config_opt_params_type[] = { CONFIG_TYPE_STRING,
-		CONFIG_TYPE_STRING };
+CONFIG_TYPE_STRING };
 
 /**
  * Configuration optional parameters default value

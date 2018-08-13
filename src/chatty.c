@@ -72,6 +72,12 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
+	if (server_init() == false) {
+		log_error("Server cannot be started.");
+		clean_workspace();
+		return 1;
+	}
+
 	if (server_start() == false) {
 		log_fatal("Cannot start chatty server!");
 		clean_workspace();
