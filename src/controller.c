@@ -44,6 +44,10 @@ bool server_init() {
 		return false;
 	}
 
+	if (rabmq_declare_init() == false) {
+		return false;
+	}
+
 	if (producer_init() == false) {
 		return false;
 	}
@@ -61,6 +65,9 @@ bool server_start() {
 		return false;
 	}
 
+	// update status
+	status = SERVER_STATUS_RUNNING;
+
 	if (consumer_start() == false) {
 		producer_destroy();
 		consumer_destroy();
@@ -74,9 +81,6 @@ bool server_start() {
 		consumer_destroy();
 		return false;
 	}
-
-	// update status
-	status = SERVER_STATUS_RUNNING;
 
 	return true;
 }

@@ -47,6 +47,7 @@ fd_set read_fds;
 
 static amqp_socket_t *p_socket = NULL;
 static amqp_connection_state_t p_conn;
+extern const char *rabmq_exchange;
 
 /**
  * Socket creation and initialization.
@@ -232,15 +233,25 @@ static inline void run_manage_conn() {
 			} else {
 				// pending operation
 				// put into queue
-				log_trace("received a message!");
 				amqp_bytes_t message_bytes;
 
 				message_bytes.len = sizeof(int);
 				message_bytes.bytes = &i;
 
-				amqp_basic_publish(p_conn, 1, amqp_cstring_bytes("amq.direct"),
-						amqp_cstring_bytes("test-queue"), 0, 0, NULL,
+				log_trace("Publishing to queue...");
+
+				int pub_status = amqp_basic_publish(p_conn, 1,
+						amqp_cstring_bytes(rabmq_exchange),
+						amqp_cstring_bytes(""), // note that it should be the routing-key
+						0, 0, NULL,
 						message_bytes);
+
+				if (pub_status != AMQP_STATUS_OK) {
+					log_error("Cannot publish message to queue!");
+					return;
+				}
+
+				log_info("Message successfully published! %d", pub_status);
 
 			}
 		}
@@ -256,7 +267,7 @@ static inline void run_cleanup() {
 
 	// close channel
 	amqp_channel_close(p_conn, 1, AMQP_REPLY_SUCCESS);
-	amqp_check_error(amqp_get_rpc_reply(p_conn), "Producer opening channel");
+	amqp_check_error(amqp_get_rpc_reply(p_conn), "Producer closing channel");
 
 	// closing active sockets
 	for (int i = 0; i < max_connections; i++) {

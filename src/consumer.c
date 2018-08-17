@@ -20,6 +20,8 @@
 #include <string.h>
 #include <libconfig.h>
 #include <sys/types.h>
+#include <sys/time.h>
+#include <sys/signal.h>
 #include <amqp.h>
 #include <amqp_tcp_socket.h>
 
@@ -59,6 +61,96 @@ bool consumer_init() {
 	return true;
 }
 
+long now_microseconds() {
+	struct timeval currentTime;
+	gettimeofday(&currentTime, NULL);
+	return currentTime.tv_sec * (int) 1e6 + currentTime.tv_usec;
+}
+
+static bool consumer_run_exception(amqp_connection_state_t conn,
+		amqp_rpc_reply_t ret, amqp_frame_t frame) {
+	if (ret.reply_type == AMQP_RESPONSE_LIBRARY_EXCEPTION
+			&& ret.library_error == AMQP_STATUS_UNEXPECTED_STATE) {
+		log_warn(
+				"[CONSUMER THREAD] Exception during message consuming... reply_type=%d",
+				ret.reply_type);
+
+		if (amqp_simple_wait_frame(conn, &frame) != AMQP_STATUS_OK) {
+			log_fatal("Simple wait frame failed");
+			return true;
+		}
+
+		if (frame.frame_type == AMQP_FRAME_METHOD) {
+			switch (frame.payload.method.id) {
+			case AMQP_BASIC_ACK_METHOD:
+				log_fatal("ACK not implemented.");
+				return true;
+			case AMQP_BASIC_RETURN_METHOD:
+				log_fatal("MANDATORY RETURN is not implemented.");
+				return true;
+			case AMQP_CONNECTION_CLOSE_METHOD:
+				log_fatal("Unexpected connection closing. Cleaning up...");
+				return true;
+			case AMQP_CHANNEL_CLOSE_METHOD:
+				log_fatal("Unexpected channel closing. Cleaning up...");
+				return true;
+				break;
+			default:
+				log_fatal("An unexpected method was received %u",
+						frame.payload.method.id);
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+static void consumer_run_work(amqp_message_t message) {
+	log_trace("message = %d", message.body.bytes);
+}
+
+static void consumer_run_wait(amqp_connection_state_t conn) {
+	amqp_frame_t frame;
+	int received = 0;
+
+	while (server_status() == SERVER_STATUS_RUNNING) {
+		amqp_rpc_reply_t ret;
+		amqp_envelope_t envelope;
+		struct timeval timeout = { 1, 0 };
+
+		log_trace("[CONSUMER THREAD] waiting for message in the queue");
+		amqp_maybe_release_buffers(conn);
+		ret = amqp_consume_message(conn, &envelope, &timeout, 0);
+
+		// Exception management
+		if (ret.reply_type != AMQP_RESPONSE_NORMAL) {
+			if (consumer_run_exception(conn, ret, frame)) {
+				log_fatal("Application PANIC: you must restart");
+				break;
+			}
+		} else {
+			log_trace("[CONSUMER THREAD] processing message in the queue");
+
+			// sending ack, only if is enabled in queue consuming
+//			log_trace("[CONSUMER THREAD] sending ACK");
+//
+//			if (amqp_basic_ack(conn, 1, envelope.delivery_tag, 0) != 0) {
+//				log_fatal("Cannot send ack!");
+//				exit(-1);
+//			}
+//			log_trace("[CONSUMER THREAD] ACK sent.");
+
+			// getting message
+			consumer_run_work(envelope.message);
+
+			amqp_destroy_envelope(&envelope);
+		}
+
+		received++;
+	}
+}
+
 static void *consumer_run(void *index_addr) {
 	// thread identification
 	const int id = *((unsigned int *) index_addr);
@@ -84,14 +176,17 @@ static void *consumer_run(void *index_addr) {
 		pthread_exit(NULL);
 	}
 
-	while (server_status() == SERVER_STATUS_RUNNING) {
-		// implements element fetching from rabbit
-		sleep(5);
-	}
+	log_trace("Set the basic consume queue...");
+	amqp_basic_consume(c_conn, 1, amqp_cstring_bytes(RABBIT_QUEUE_NAME),
+			amqp_empty_bytes, 0, 1, 0, amqp_empty_table);
+
+	amqp_check_error(amqp_get_rpc_reply(c_conn), "Setting consuming queue");
+
+	consumer_run_wait(c_conn);
 
 	// close channel
 	amqp_channel_close(c_conn, 1, AMQP_REPLY_SUCCESS);
-	amqp_check_error(amqp_get_rpc_reply(c_conn), "Consumer opening channel");
+	amqp_check_error(amqp_get_rpc_reply(c_conn), "Consumer closing channel");
 
 	// destroying connection
 	rabmq_destroy(&c_conn);
@@ -118,6 +213,7 @@ bool consumer_start() {
 void consumer_wait() {
 	for (int i = 0; i < consumer_threads_n; i++) {
 		log_debug("Waiting for consumer thread %d", i);
+//		pthread_kill(consumer_threads[i], SIGKILL);
 		pthread_join(consumer_threads[i], NULL);
 		log_debug("Consumer thread %d done", i);
 	}

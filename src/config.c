@@ -52,7 +52,7 @@ CONFIG_TYPE_STRING };
 /**
  * Configuration optional parameters default value
  */
-static const void *config_opt_params_default_value[] = { "EX", "E32838dck" };
+static const void *config_opt_params_default_value[] = { "chatty-exchange", "chatty2018" };
 
 /**
  * Size of array that contains required configuration
@@ -95,7 +95,7 @@ static void config_load_default(int i, char type) {
 /**
  * @brief This function load into memory the file passed as configuration file.
  * If any problem occurs during loading it returns false.
- * @param conf_file_path string that represents the path of config file.
+ * @param conf_file_path string that represents the path of configuration file.
  *
  */
 bool config_parse(char *conf_file_path) {

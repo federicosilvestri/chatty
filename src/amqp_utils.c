@@ -24,10 +24,11 @@ extern config_t server_conf;
 static bool initialized = false;
 
 static const char *rabmq_hostname;
-static const char *rabmq_exchange;
-static const char *rabmq_bindkey;
 static int rabmq_port;
 static int p_status;
+
+const char *rabmq_exchange;
+const char *rabmq_bindkey;
 
 /**
  * This function retrieves RabbitMQ parameters by server_conf
@@ -70,6 +71,49 @@ bool rabmq_init_params() {
 			rabmq_port, rabmq_exchange, rabmq_bindkey);
 
 	initialized = true;
+	return true;
+}
+
+bool rabmq_declare_init() {
+	amqp_socket_t *socket = NULL;
+	amqp_connection_state_t conn;
+
+	if (!rabmq_init(&socket, &conn)) {
+		log_fatal("Cannot connect to RabbitMQ server during queue declaration");
+		return false;
+	}
+
+	amqp_channel_open(conn, 1);
+	amqp_check_error(amqp_get_rpc_reply(conn), "Opening channel");
+
+	log_debug("Declaring exchange");
+	amqp_exchange_declare_ok_t *ex_reply = amqp_exchange_declare(conn, 1,
+			amqp_cstring_bytes(rabmq_exchange),
+			amqp_cstring_bytes("fanout"), 0, 0, 0, 0, amqp_empty_table);
+	if (ex_reply == NULL) {
+		amqp_check_error(amqp_get_rpc_reply(conn), "Exchange declaring");
+		return false;
+	}
+
+	log_debug("Declaring queue");
+	amqp_queue_declare_ok_t *q_reply = amqp_queue_declare(conn, 1,
+			amqp_cstring_bytes(RABBIT_QUEUE_NAME), 0, 0, 0, 1,
+			amqp_empty_table);
+	if (q_reply == NULL) {
+		amqp_check_error(amqp_get_rpc_reply(conn), "Queue declaring");
+		return false;
+	}
+
+	log_debug("Binding queue...");
+	amqp_queue_bind(conn, 1, amqp_cstring_bytes(RABBIT_QUEUE_NAME),
+			amqp_cstring_bytes(rabmq_exchange),
+			amqp_cstring_bytes(rabmq_bindkey), amqp_empty_table);
+	amqp_check_error(amqp_get_rpc_reply(conn), "Binding queue");
+
+	amqp_check_error(amqp_channel_close(conn, 1, AMQP_REPLY_SUCCESS),
+			"Closing declaring queue channel");
+	rabmq_destroy(&conn);
+
 	return true;
 }
 
