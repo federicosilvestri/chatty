@@ -28,6 +28,7 @@
 #include "consumer.h"
 
 int *sockets;
+bool *sockets_block;
 
 /**
  * This is the internal status variable.

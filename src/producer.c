@@ -43,6 +43,8 @@ static const struct timespec select_intv = { 0, 500 };
 static pthread_t producer_thread;
 
 extern int *sockets;
+extern bool *sockets_block;
+
 fd_set read_fds;
 
 static amqp_socket_t *p_socket = NULL;
@@ -119,8 +121,10 @@ static bool producer_socket_init() {
 
 	// initialize client socket
 	sockets = malloc(sizeof(int) * max_connections);
+	sockets_block = malloc(sizeof(bool) * max_connections);
 	for (int i = 0; i < max_connections; i++) {
 		sockets[i] = 0;
+		sockets_block[i] = false;
 	}
 
 	return true;
@@ -174,7 +178,7 @@ static inline int run_init_socket_fds() {
 		int sd = sockets[i];
 
 		// If valid socket descriptor then add to read list
-		if (sd > 0) {
+		if (sd > 0 && sockets_block[i] == false) {
 			FD_SET(sd, &read_fds);
 		}
 
@@ -224,27 +228,31 @@ static inline void run_manage_conn() {
 		if (FD_ISSET(sd, &read_fds)) {
 			// check closed socket
 			int valread;
-			char buffer[1024];
+			char buffer[1];
 
-			if ((valread = read(sd, buffer, 1024)) == 0) {
+			if ((valread = read(sd, buffer, 1)) == 0) {
 				log_info("Host disconnected");
 				close(sd);
 				sockets[i] = 0;
+				sockets_block[i] = false;
 			} else {
 				// pending operation
-				// put into queue
+				// block the socket
+				sockets_block[i] = true;
+				log_trace("Sockets %d is NOW BLOCKED", sockets[i]);
+
+				// prepare the id
+				int udata[1] = { i };
 				amqp_bytes_t message_bytes;
-
 				message_bytes.len = sizeof(int);
-				message_bytes.bytes = &i;
+				message_bytes.bytes = udata;
 
-				log_trace("Publishing to queue...");
-
+				// put into queue
+						log_trace("Publishing to queue...");
 				int pub_status = amqp_basic_publish(p_conn, 1,
 						amqp_cstring_bytes(rabmq_exchange),
 						amqp_cstring_bytes(""), // note that it should be the routing-key
-						0, 0, NULL,
-						message_bytes);
+						0, 0, NULL, message_bytes);
 
 				if (pub_status != AMQP_STATUS_OK) {
 					log_error("Cannot publish message to queue!");
@@ -252,7 +260,6 @@ static inline void run_manage_conn() {
 				}
 
 				log_info("Message successfully published! %d", pub_status);
-
 			}
 		}
 	}
@@ -384,4 +391,5 @@ void producer_destroy() {
 	// Destroying sockets
 	log_debug("Destroying sockets array");
 	free(sockets);
+	free(sockets_block);
 }

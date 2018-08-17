@@ -28,9 +28,9 @@
 #include "log.h"
 #include "amqp_utils.h"
 #include "controller.h"
+#include "worker.h"
 
 extern config_t server_conf;
-extern int *sockets;
 
 static pthread_t *consumer_threads;
 static int consumer_threads_n;
@@ -106,11 +106,7 @@ static bool consumer_run_exception(amqp_connection_state_t conn,
 	return false;
 }
 
-static void consumer_run_work(amqp_message_t message) {
-	log_trace("message = %d", message.body.bytes);
-}
-
-static void consumer_run_wait(amqp_connection_state_t conn) {
+static void consumer_run_wait(amqp_connection_state_t conn, int tid) {
 	amqp_frame_t frame;
 	int received = 0;
 
@@ -119,7 +115,6 @@ static void consumer_run_wait(amqp_connection_state_t conn) {
 		amqp_envelope_t envelope;
 		struct timeval timeout = { 1, 0 };
 
-		log_trace("[CONSUMER THREAD] waiting for message in the queue");
 		amqp_maybe_release_buffers(conn);
 		ret = amqp_consume_message(conn, &envelope, &timeout, 0);
 
@@ -130,19 +125,11 @@ static void consumer_run_wait(amqp_connection_state_t conn) {
 				break;
 			}
 		} else {
-			log_trace("[CONSUMER THREAD] processing message in the queue");
+			log_trace("[CONSUMER THREAD %d] processing message in the queue",
+					tid);
 
-			// sending ack, only if is enabled in queue consuming
-//			log_trace("[CONSUMER THREAD] sending ACK");
-//
-//			if (amqp_basic_ack(conn, 1, envelope.delivery_tag, 0) != 0) {
-//				log_fatal("Cannot send ack!");
-//				exit(-1);
-//			}
-//			log_trace("[CONSUMER THREAD] ACK sent.");
-
-			// getting message
-			consumer_run_work(envelope.message);
+			// start the worker
+			worker_run(envelope.message);
 
 			amqp_destroy_envelope(&envelope);
 		}
@@ -182,7 +169,7 @@ static void *consumer_run(void *index_addr) {
 
 	amqp_check_error(amqp_get_rpc_reply(c_conn), "Setting consuming queue");
 
-	consumer_run_wait(c_conn);
+	consumer_run_wait(c_conn, id);
 
 	// close channel
 	amqp_channel_close(c_conn, 1, AMQP_REPLY_SUCCESS);
