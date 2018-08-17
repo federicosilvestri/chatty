@@ -94,7 +94,7 @@ int main(int argc, char *argv[]) {
 	while (server_status() == SERVER_STATUS_RUNNING) {
 		log_trace("MAIN THREAD: waiting for server to finish");
 		int action = signal_manager_wait();
-		log_warn("woke up from sleeping with signal %d", action);
+		log_info("woke up from sleeping with signal %d", action);
 
 		switch (action) {
 		case SIGINT:

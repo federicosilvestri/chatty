@@ -72,7 +72,24 @@ int openConnection(char* path, unsigned int ntimes, unsigned int secs) {
  *         (se <0 errno deve essere settato, se == 0 connessione chiusa)
  */
 int readHeader(long connfd, message_hdr_t *hdr) {
-	return 0;
+	if (connfd < 0) {
+		errno = ENOENT;
+		return -1;
+	}
+
+	memset(hdr, 0, sizeof(message_hdr_t));
+	int read_size = read(connfd, hdr, sizeof(message_hdr_t));
+
+	if (read_size <= 0) {
+		if (read_size == 0) {
+			errno = 0;
+		}
+
+		// errno already set
+		return -1;
+	}
+
+	return 1;
 }
 
 /**
@@ -84,8 +101,25 @@ int readHeader(long connfd, message_hdr_t *hdr) {
  * @return <=0 se c'e' stato un errore
  *         (se <0 errno deve essere settato, se == 0 connessione chiusa)
  */
-int readData(long fd, message_data_t *data) {
-	return 0;
+int readData(long connfd, message_data_t *data) {
+	if (connfd < 0) {
+		errno = ENOENT;
+		return -1;
+	}
+
+	memset(data, 0, sizeof(message_data_t));
+	int read_size = read(connfd, data, sizeof(message_data_t));
+
+	if (read_size <= 0) {
+		if (read_size == 0) {
+			errno = 0;
+		}
+
+		// errno already set
+		return -1;
+	}
+
+	return 1;
 }
 
 /**
@@ -97,8 +131,29 @@ int readData(long fd, message_data_t *data) {
  * @return <=0 se c'e' stato un errore
  *         (se <0 errno deve essere settato, se == 0 connessione chiusa)
  */
-int readMsg(long fd, message_t *msg) {
-	return 0;
+int readMsg(long connfd, message_t *msg) {
+	if (connfd < 0) {
+		errno = ENOENT;
+		return -1;
+	}
+
+	// initialize message
+	memset(msg, 0, sizeof(message_t));
+
+	// reading
+	int read_hdr_r = readHeader(connfd, &(msg->hdr));
+	int read_data_r = readData(connfd, &(msg->data));
+
+	// checking
+	if (read_hdr_r <= 0) {
+		return read_hdr_r;
+	}
+
+	if (read_data_r <= 0) {
+		return read_data_r;
+	}
+
+	return 1;
 }
 
 /* da completare da parte dello studente con altri metodi di interfaccia */
@@ -113,7 +168,7 @@ int readMsg(long fd, message_t *msg) {
  * @return <=0 se c'e' stato un errore
  */
 int sendRequest(long fd, message_t *msg) {
-	return 0;
+	return 1;
 }
 
 /**

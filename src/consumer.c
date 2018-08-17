@@ -128,7 +128,7 @@ static void consumer_run_wait(amqp_connection_state_t conn, int tid) {
 			log_trace("[CONSUMER THREAD %d] processing message in the queue",
 					tid);
 
-			// start the worker
+			// execute the worker
 			worker_run(envelope.message);
 
 			amqp_destroy_envelope(&envelope);
