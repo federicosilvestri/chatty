@@ -7,6 +7,7 @@
  *******************************************************************************/
 #include "connections.h"
 
+#include <stdio.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -37,7 +38,7 @@ int openConnection(char* path, unsigned int ntimes, unsigned int secs) {
 	}
 
 	socket_address.sun_family = AF_UNIX;
-	strncpy(socket_address.sun_path, path, strlen(path));
+	strncpy(socket_address.sun_path, path, UNIX_PATH_MAX);
 
 	// check parameters validity
 	retries = (ntimes < MAX_RETRIES) ? ntimes : MAX_RETRIES;
@@ -168,7 +169,17 @@ int readMsg(long connfd, message_t *msg) {
  * @return <=0 se c'e' stato un errore
  */
 int sendRequest(long fd, message_t *msg) {
-	return 1;
+	if (fd < 0) {
+		return -1;
+	}
+
+	int w_size = write(fd, msg, sizeof(msg));
+
+	if (w_size <= 0) {
+		return -1;
+	}
+
+	return 0;
 }
 
 /**
@@ -180,5 +191,15 @@ int sendRequest(long fd, message_t *msg) {
  * @return <=0 se c'e' stato un errore
  */
 int sendData(long fd, message_data_t *msg) {
+	if (fd < 0) {
+		return -1;
+	}
+
+	int w_size = write(fd, msg, sizeof(msg));
+
+	if (w_size <= 0) {
+		return -1;
+	}
+
 	return 0;
 }

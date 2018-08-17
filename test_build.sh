@@ -30,7 +30,7 @@ cp -r ./src/* TestDebug/
 cp -r ./include/* TestDebug/
 cp ./makefiles/Makefile TestDebug/
 cp -r ./scripts/* TestDebug/
-
+cp -r ./DATA TestDebug/
 chmod a+x ./TestDebug/*.sh
 
 echo "Launching make..."
