@@ -26,6 +26,7 @@
 #include "amqp_utils.h"
 #include "producer.h"
 #include "consumer.h"
+#include "userman.h"
 
 /**
  * This is the internal status variable.
@@ -43,6 +44,10 @@ bool server_init() {
 	}
 
 	if (rabmq_declare_init() == false) {
+		return false;
+	}
+
+	if (userman_init() == false) {
 		return false;
 	}
 
@@ -115,4 +120,7 @@ void server_destroy() {
 
 	// consumer
 	consumer_destroy();
+
+	// userman
+	userman_destroy();
 }

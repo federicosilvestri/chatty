@@ -51,7 +51,7 @@ ARFLAGS         =  rvs
 INCLUDES	= -I.
 LDFLAGS 	= -L.
 OPTFLAGS	= #-O3 
-LIBS            = -pthread -lconfig -lrabbitmq
+LIBS            = -pthread -lconfig -lrabbitmq -lsqlite3
 
 # aggiungere qui altri targets se necessario
 TARGETS		= chatty        \

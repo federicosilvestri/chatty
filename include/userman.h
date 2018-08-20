@@ -26,6 +26,11 @@ typedef struct {
  */
 bool userman_init();
 
+/**
+ * Deallocate and destroy userman.
+ */
+void userman_destroy();
+
 
 #define USERMAN_H
 #endif /* USERMAN_H */

@@ -176,3 +176,6 @@ nbdist/
 /DebugClang/
 /TestDebug/
 /Client/
+
+# Sqlite
+*.db

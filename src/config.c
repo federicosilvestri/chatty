@@ -41,18 +41,18 @@ CONFIG_TYPE_STRING, CONFIG_TYPE_STRING, CONFIG_TYPE_INT };
  * Configuration optional parameters path
  */
 static const char *config_opt_params[] =
-		{ "RabbitMQExchange", "RabbitMQBindKey" };
+		{ "RabbitMQExchange", "RabbitMQBindKey", "DatabasePathname" };
 
 /**
  * Configuration optional parameters type
  */
 static const char config_opt_params_type[] = { CONFIG_TYPE_STRING,
-CONFIG_TYPE_STRING };
+CONFIG_TYPE_STRING, CONFIG_TYPE_STRING };
 
 /**
  * Configuration optional parameters default value
  */
-static const void *config_opt_params_default_value[] = { "chatty-exchange", "chatty2018" };
+static const void *config_opt_params_default_value[] = { "chatty-exchange", "chatty2018", "userman.db" };
 
 /**
  * Size of array that contains required configuration
@@ -63,7 +63,7 @@ static const void *config_opt_params_default_value[] = { "chatty-exchange", "cha
 /**
  * Size of optional parameters.
  */
-#define CONFIG_OPTIONAL_PARAMS_SIZE 2
+#define CONFIG_OPTIONAL_PARAMS_SIZE 3
 
 /**
  * Main configuration container.

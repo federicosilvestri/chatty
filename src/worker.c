@@ -37,14 +37,25 @@ static short int check_header(message_hdr_t hdr) {
 	return 0;
 }
 
-static void register_user() {
+static void register_user(int index) {
+	// register..
+	message_hdr_t hdr_reply;
+	memset(&hdr_reply, 0, sizeof(message_hdr_t));
 
+	hdr_reply.op = OP_OK;
+
+	if (write(sockets[index], &hdr_reply, sizeof(hdr_reply)) <= 0) {
+		log_error("Cannot send to socket!");
+	}
+
+	log_info("User registered!");
+	// we need now to send the user list
 }
 
-static int worker_action_router(message_t msg) {
+static int worker_action_router(int index, message_t msg) {
 	switch (msg.hdr.op) {
 	case REGISTER_OP:
-		register_user();
+		register_user(index);
 		break;
 	case CONNECT_OP:
 	case POSTTXT_OP:
@@ -55,6 +66,7 @@ static int worker_action_router(message_t msg) {
 	case USRLIST_OP:
 	case UNREGISTER_OP:
 	case DISCONNECT_OP:
+		log_fatal("NOT IMPLEMENTED ACTIONS");
 		break;
 	case CREATEGROUP_OP:
 	case ADDGROUP_OP:
@@ -93,7 +105,7 @@ void worker_run(amqp_message_t message) {
 		return;
 	}
 
-	int ra_ret = worker_action_router(msg);
+	int ra_ret = worker_action_router(index, msg);
 
 	if (ra_ret == -1) {
 		// grave problem

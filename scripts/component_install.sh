@@ -28,7 +28,7 @@ if [ -x "$(command -v sudo)" ]; then
 	su_cmd="sudo"
 fi
 
-$su_cmd apt install -y libconfig-dev libconfig9 rabbitmq-server librabbitmq4 librabbitmq-dev
+$su_cmd apt install -y libconfig-dev libconfig9 rabbitmq-server librabbitmq4 librabbitmq-dev sqlite3 libsqlite3-dev
 
 if ! [ $? -eq 0 ]; then
 	echo "Problem during install dependencies!"

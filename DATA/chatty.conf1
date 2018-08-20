@@ -19,7 +19,7 @@ UnixPath="/tmp/chatty_socket"
 MaxConnections=32
 
 # numero di thread nel pool 
-ThreadsInPool=4
+ThreadsInPool=1
 
 # dimensione massima di un messaggio testuale (numero di caratteri)
 MaxMsgSize=512
