@@ -81,16 +81,7 @@ int readHeader(long connfd, message_hdr_t *hdr) {
 	memset(hdr, 0, sizeof(message_hdr_t));
 	int read_size = read(connfd, hdr, sizeof(message_hdr_t));
 
-	if (read_size <= 0) {
-		if (read_size == 0) {
-			errno = 0;
-		}
-
-		// errno already set
-		return -1;
-	}
-
-	return 1;
+	return read_size;
 }
 
 /**
@@ -111,16 +102,7 @@ int readData(long connfd, message_data_t *data) {
 	memset(data, 0, sizeof(message_data_t));
 	int read_size = read(connfd, data, sizeof(message_data_t));
 
-	if (read_size <= 0) {
-		if (read_size == 0) {
-			errno = 0;
-		}
-
-		// errno already set
-		return -1;
-	}
-
-	return 1;
+	return read_size;
 }
 
 /**
@@ -142,16 +124,11 @@ int readMsg(long connfd, message_t *msg) {
 	memset(msg, 0, sizeof(message_t));
 
 	// reading
-	int read_hdr_r = readHeader(connfd, &(msg->hdr));
-	int read_data_r = readData(connfd, &(msg->data));
+	int read_size = read(connfd, msg, sizeof(message_t));
 
 	// checking
-	if (read_hdr_r <= 0) {
-		return read_hdr_r;
-	}
-
-	if (read_data_r <= 0) {
-		return read_data_r;
+	if (read_size <= 0) {
+		return read_size;
 	}
 
 	return 1;
@@ -173,7 +150,7 @@ int sendRequest(long fd, message_t *msg) {
 		return -1;
 	}
 
-	int w_size = write(fd, msg, sizeof(msg));
+	int w_size = write(fd, msg, sizeof(message_t));
 
 	if (w_size <= 0) {
 		return -1;

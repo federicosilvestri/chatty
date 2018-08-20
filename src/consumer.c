@@ -68,12 +68,14 @@ long now_microseconds() {
 }
 
 static bool consumer_run_exception(amqp_connection_state_t conn,
-		amqp_rpc_reply_t ret, amqp_frame_t frame) {
+		amqp_rpc_reply_t ret) {
 	if (ret.reply_type == AMQP_RESPONSE_LIBRARY_EXCEPTION
 			&& ret.library_error == AMQP_STATUS_UNEXPECTED_STATE) {
 		log_warn(
 				"[CONSUMER THREAD] Exception during message consuming... reply_type=%d",
 				ret.reply_type);
+
+		amqp_frame_t frame;
 
 		if (amqp_simple_wait_frame(conn, &frame) != AMQP_STATUS_OK) {
 			log_fatal("Simple wait frame failed");
@@ -107,7 +109,6 @@ static bool consumer_run_exception(amqp_connection_state_t conn,
 }
 
 static void consumer_run_wait(amqp_connection_state_t conn, int tid) {
-	amqp_frame_t frame;
 	int received = 0;
 
 	while (server_status() == SERVER_STATUS_RUNNING) {
@@ -120,7 +121,7 @@ static void consumer_run_wait(amqp_connection_state_t conn, int tid) {
 
 		// Exception management
 		if (ret.reply_type != AMQP_RESPONSE_NORMAL) {
-			if (consumer_run_exception(conn, ret, frame)) {
+			if (consumer_run_exception(conn, ret)) {
 				log_fatal("Application PANIC: you must restart");
 				break;
 			}
