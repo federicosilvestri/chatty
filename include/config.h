@@ -17,11 +17,6 @@
 #include <stdbool.h>
 
 /**
- * Max length of user name
- */
-#define MAX_NAME_LENGTH	32
-
-/**
  * @brief This function load into memory the file passed as configuration file.
  * If any problem occurs during loading it returns false.
  * @param conf_file_path string that represents the path of config file.

@@ -27,9 +27,6 @@
 #include "producer.h"
 #include "consumer.h"
 
-int *sockets;
-bool *sockets_block;
-
 /**
  * This is the internal status variable.
  * It must not be affected by concurrency race.

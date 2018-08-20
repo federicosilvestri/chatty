@@ -27,19 +27,6 @@
 #include "controller.h"
 
 extern int *sockets;
-extern bool *sockets_block;
-
-static void disconnect_host(int index) {
-	int fd = sockets[index];
-
-	close(sockets[index]);
-	sockets[index] = 0;
-	log_info("Host disconnected");
-
-	// release sockets block
-	sockets_block[index] = false;
-	log_trace("SOCKET %d is now UNLOCKED", fd);
-}
 
 static short int check_header(message_hdr_t hdr) {
 	if (hdr.sender == NULL || strlen(hdr.sender) == 0) {
@@ -60,16 +47,20 @@ void worker_run(amqp_message_t message) {
 	read_size = readMsg(sockets[index], &msg);
 
 	if (read_size == 0) {
-		disconnect_host(index);
+		producer_disconnect_host(index);
+		// no other operation are possible on socket.
 		return;
 	}
 
 	if (check_header(msg.hdr) == 1) {
 		log_warn("Someone has sent anonymous message, rejecting");
-		disconnect_host(index);
+		producer_disconnect_host(index);
+		// no other operation are possible on socket.
+		return;
 	}
 
-	// read body of message
-	log_error("Message header contains sender=%s", msg.hdr.sender);
+	log_info("Message header contains sender=%s", msg.hdr.sender);
 
+	producer_unlock_socket(index);
+	// no other operation are possible on socket.
 }

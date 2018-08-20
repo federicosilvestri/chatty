@@ -42,14 +42,61 @@ static const struct timespec select_intv = { 0, 500 };
 
 static pthread_t producer_thread;
 
-extern int *sockets;
-extern bool *sockets_block;
+/**
+ * Array (dynamically allocated) that contains
+ * all socket file descriptors.
+ */
+int *sockets;
+
+/**
+ * Array (dynamically allocated) that contains a
+ * boolean value to check if socket file descriptor
+ * is in use or not.
+ */
+bool *sockets_block;
+
+pthread_mutex_t socket_mutex;
 
 fd_set read_fds;
 
 static amqp_socket_t *p_socket = NULL;
 static amqp_connection_state_t p_conn;
 extern const char *rabmq_exchange;
+
+/**
+ * Internal function to lock the
+ * socket file descriptor.
+ *
+ * @param index index of sockets array
+ */
+static void producer_lock_socket(int index) {
+	pthread_mutex_lock(&socket_mutex);
+	if (sockets_block[index] == true) {
+		log_fatal("Socket is already locked.");
+		exit(1);
+	}
+
+	sockets_block[index] = true;
+	pthread_mutex_unlock(&socket_mutex);
+}
+
+void producer_unlock_socket(int index) {
+	pthread_mutex_lock(&socket_mutex);
+	if (sockets_block[index] == false) {
+		log_fatal("Socket is already unlocked.");
+		exit(1);
+	}
+
+	sockets_block[index] = false;
+	pthread_mutex_unlock(&socket_mutex);
+}
+
+void producer_disconnect_host(int index) {
+	int fd = sockets[index];
+	close(sockets[index]);
+	sockets[index] = 0;
+	producer_unlock_socket(index);
+}
 
 /**
  * Socket creation and initialization.
@@ -174,6 +221,8 @@ static inline int run_init_socket_fds() {
 
 	int max_sd = listen_socket_fd;
 
+	pthread_mutex_lock(&socket_mutex);
+
 	for (int i = 0; i < max_connections; i++) {
 		int sd = sockets[i];
 
@@ -187,6 +236,8 @@ static inline int run_init_socket_fds() {
 			max_sd = sd;
 		}
 	}
+
+	pthread_mutex_unlock(&socket_mutex);
 
 	return max_sd;
 }
@@ -228,8 +279,8 @@ static inline void run_manage_conn() {
 		if (FD_ISSET(sd, &read_fds)) {
 			// pending operation
 			// block the socket
-			sockets_block[i] = true;
-			log_trace("Sockets %d is NOW BLOCKED", sockets[i]);
+			producer_lock_socket(i);
+//			log_trace("Sockets %d is NOW BLOCKED", sockets[i]);
 
 			// prepare the id
 			int udata[1] = { i };

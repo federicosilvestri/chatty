@@ -10,8 +10,12 @@
 
 #include <assert.h>
 #include <string.h>
-#include <config.h>
 #include "ops.h"
+
+/**
+ * Max length of user name
+ */
+#define MAX_NAME_LENGTH	120
 
 /**
  * @file  message.h
