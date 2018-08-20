@@ -1,3 +1,13 @@
+/*******************************************************************************
+ * SOL 2017/2018
+ * Chatty
+ * Federico Silvestri 559014
+ * Si dichiara che il contenuto di questo file e' in ogni sua parte opera
+ * originale dell'autore.
+ *******************************************************************************/
+#ifndef PRODUCER_H
+#define PRODUCER_H
+
 #include <stdbool.h>
 #include <libconfig.h>
 
@@ -36,7 +46,7 @@ void producer_destroy();
  * @brief disconnect the host
  * @param index of socket array to disconnect
  */
-void disconnect_host(int);
+void producer_disconnect_host(int);
 
 /**
  * This function unlocks (releases) the selected
@@ -45,4 +55,6 @@ void disconnect_host(int);
  * @brief release socket to producer
  * @param int socket index
  */
-void unlock_socket(int);
+void producer_unlock_socket(int);
+
+#endif /* PRODUCER_H */

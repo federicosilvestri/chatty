@@ -92,7 +92,6 @@ void producer_unlock_socket(int index) {
 }
 
 void producer_disconnect_host(int index) {
-	int fd = sockets[index];
 	close(sockets[index]);
 	sockets[index] = 0;
 	producer_unlock_socket(index);

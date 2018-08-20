@@ -5,8 +5,6 @@
  * Si dichiara che il contenuto di questo file e' in ogni sua parte opera
  * originale dell'autore.
  *******************************************************************************/
-
-
 #ifndef CONSUMER_H_
 #define CONSUMER_H_
 

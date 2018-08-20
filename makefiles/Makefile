@@ -14,7 +14,7 @@ FILE_DA_CONSEGNARE=Makefile chatty.c message.h ops.h stats.h config.h \
 		   amqp_utils.c log.c controller.c signal_manager.c \
 		   amqp_utils.h log.h controller.h signal_manager.h \
 		   producer.h producer.c consumer.c consumer.h worker.c \
-		   worker.h
+		   worker.h userman.h userman.c
 # inserire il nome del tarball: es. NinoBixio
 TARNAME=FedericoSilvestri
 # inserire il corso di appartenenza: CorsoA oppure CorsoB
@@ -59,7 +59,7 @@ TARGETS		= chatty        \
 
 
 # aggiungere qui i file oggetto da compilare
-OBJECTS		= log.o config.o signal_manager.o controller.o connections.o producer.o consumer.o amqp_utils.o worker.o
+OBJECTS		= log.o config.o signal_manager.o controller.o connections.o producer.o consumer.o amqp_utils.o worker.o userman.o
 
 # aggiungere qui gli altri include 
 INCLUDE_FILES   = connections.h \
@@ -71,7 +71,8 @@ INCLUDE_FILES   = connections.h \
 		  amqp_utils.h		\
 		  controller.h		\
 		  producer.h		\
-		  worker.h
+		  worker.h			\
+		  userman.h
 		  
 .PHONY: deps all clean cleanall test1 test2 test3 test4 test5 consegna
 .SUFFIXES: .c .h

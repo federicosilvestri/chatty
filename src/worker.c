@@ -22,15 +22,49 @@
 #include "message.h"
 #include "ops.h"
 
-#include "producer.h"
 #include "log.h"
 #include "controller.h"
+#include "producer.h"
+#include "userman.h"
 
 extern int *sockets;
 
 static short int check_header(message_hdr_t hdr) {
 	if (hdr.sender == NULL || strlen(hdr.sender) == 0) {
 		return 1;
+	}
+
+	return 0;
+}
+
+static void register_user() {
+
+}
+
+static int worker_action_router(message_t msg) {
+	switch (msg.hdr.op) {
+	case REGISTER_OP:
+		register_user();
+		break;
+	case CONNECT_OP:
+	case POSTTXT_OP:
+	case POSTTXTALL_OP:
+	case POSTFILE_OP:
+	case GETFILE_OP:
+	case GETPREVMSGS_OP:
+	case USRLIST_OP:
+	case UNREGISTER_OP:
+	case DISCONNECT_OP:
+		break;
+	case CREATEGROUP_OP:
+	case ADDGROUP_OP:
+	case DELGROUP_OP:
+		// optional
+		break;
+	default:
+		log_error("Operation not recognized by server, bad protocol.");
+		return -1;
+
 	}
 
 	return 0;
@@ -59,7 +93,13 @@ void worker_run(amqp_message_t message) {
 		return;
 	}
 
-	log_info("Message header contains sender=%s", msg.hdr.sender);
+	int ra_ret = worker_action_router(msg);
+
+	if (ra_ret == -1) {
+		// grave problem
+		producer_disconnect_host(index);
+		return;
+	}
 
 	producer_unlock_socket(index);
 	// no other operation are possible on socket.

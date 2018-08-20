@@ -5,9 +5,8 @@
  * Si dichiara che il contenuto di questo file e' in ogni sua parte opera
  * originale dell'autore.
  *******************************************************************************/
-
-#ifndef SERVER_H_
-#define SERVER_H_
+#ifndef CONTROLLER_H
+#define CONTROLLER_H
 
 #include <stdbool.h>
 #include <libconfig.h>
@@ -79,4 +78,4 @@ void server_wait();
  */
 void server_destroy();
 
-#endif /* SERVER_H_ */
+#endif /* CONTROLLER_H */
