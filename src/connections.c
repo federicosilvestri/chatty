@@ -8,11 +8,13 @@
 #include "connections.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/un.h>
 #include <errno.h>
+#include <unistd.h>
 
 /**
  * @brief Apre una connessione AF_UNIX verso il server
@@ -25,12 +27,31 @@
  *         -1 in caso di errore
  */
 int openConnection(char* path, unsigned int ntimes, unsigned int secs) {
-	// create socket
+	unsigned int retries, sleeping;
+	// check parameters validity
+	retries = (ntimes < MAX_RETRIES) ? ntimes : MAX_RETRIES;
+	sleeping = (secs < MAX_SLEEPING) ? secs : MAX_SLEEPING;
+
+	// first check if file exists
+	int stop = 0;
+	for (int i = 0; i < ntimes && stop == 0; i++) {
+		if (access(path, F_OK) == -1) {
+			// file does not exist
+			sleep(sleeping);
+		} else {
+			stop = 1;
+		}
+	}
+
+	if (stop == 0) {
+		errno = ENOENT;
+		return -1;
+	}
+
+	// creating socket
 	int fd;
 	struct sockaddr_un socket_address;
-	unsigned int retries, sleeping;
 	int conn_status;
-
 	fd = socket(AF_UNIX, SOCK_STREAM, 0);
 
 	if (fd < 0) {
@@ -39,10 +60,6 @@ int openConnection(char* path, unsigned int ntimes, unsigned int secs) {
 
 	socket_address.sun_family = AF_UNIX;
 	strncpy(socket_address.sun_path, path, UNIX_PATH_MAX);
-
-	// check parameters validity
-	retries = (ntimes < MAX_RETRIES) ? ntimes : MAX_RETRIES;
-	sleeping = (secs < MAX_SLEEPING) ? secs : MAX_SLEEPING;
 
 	do {
 		retries -= 1;
@@ -63,6 +80,7 @@ int openConnection(char* path, unsigned int ntimes, unsigned int secs) {
 }
 
 // -------- server side -----
+
 /**
  * @brief Legge l'header del messaggio
  *
@@ -100,9 +118,21 @@ int readData(long connfd, message_data_t *data) {
 	}
 
 	memset(data, 0, sizeof(message_data_t));
-	int read_size = read(connfd, data, sizeof(message_data_t));
+	int r_size = read(connfd, data, sizeof(message_data_t));
 
-	return read_size;
+	if (r_size <= 0) {
+		return r_size;
+	}
+
+	// read payload
+	data->buf = calloc(sizeof(char), data->hdr.len);
+	int p_size = read(connfd, data->buf, data->hdr.len);
+
+	if (p_size <= 0) {
+		return p_size;
+	}
+
+	return r_size + p_size;
 }
 
 /**
@@ -175,8 +205,15 @@ int sendData(long fd, message_data_t *msg) {
 	int w_size = write(fd, msg, sizeof(msg));
 
 	if (w_size <= 0) {
-		return -1;
+		return w_size;
 	}
 
-	return 0;
+	// write payload
+	int p_size = write(fd, msg->buf, msg->hdr.len);
+
+	if (p_size <= 0) {
+		return p_size;
+	}
+
+	return w_size + p_size;
 }

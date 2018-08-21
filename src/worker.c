@@ -29,33 +29,64 @@
 
 extern int *sockets;
 
+static void prepare_header(message_hdr_t *hdr) {
+	memset(hdr, 0, sizeof(message_hdr_t));
+	strncpy(hdr->sender, "SERVER", sizeof(hdr->sender));
+}
+
+
 static short int check_header(message_hdr_t hdr) {
-	if (hdr.sender == NULL || strlen(hdr.sender) == 0) {
+	if (strlen(hdr.sender) == 0) {
 		return 1;
 	}
 
 	return 0;
 }
 
-static void register_user(int index) {
-	// register..
+static void worker_user_list(int index) {
+	message_data_t reply;
+	memset(&reply, 0, sizeof(message_data_t));
+
+	int online_users = 1;
+	int len = sizeof(char) * (MAX_NAME_LENGTH + 1) * online_users;
+
+	reply.buf = calloc(sizeof(char), len);
+
+	reply.buf[0] = 'c';
+	reply.buf[1] = 'c';
+	reply.buf[2] = 'c';
+	reply.buf[3] = 'c';
+	reply.buf[4] = '\0';
+	reply.hdr.len = len;
+
+	int w_size = sendData(sockets[index], &reply);
+
+	if (w_size <= 0) {
+		log_warn("Client disconnected without 'thanks', %s", strerror(errno));
+	}
+
+	free(reply.buf);
+}
+
+static void worker_register_user(int index) {
 	message_hdr_t hdr_reply;
-	memset(&hdr_reply, 0, sizeof(message_hdr_t));
+	prepare_header(&hdr_reply);
+
+	log_trace("Registering user");
 
 	hdr_reply.op = OP_OK;
 
 	if (write(sockets[index], &hdr_reply, sizeof(hdr_reply)) <= 0) {
-		log_error("Cannot send to socket!");
+		log_error("Cannot send to socket, %s", strerror(errno));
 	}
-
-	log_info("User registered!");
 	// we need now to send the user list
+	worker_user_list(index);
 }
 
 static int worker_action_router(int index, message_t msg) {
 	switch (msg.hdr.op) {
 	case REGISTER_OP:
-		register_user(index);
+		worker_register_user(index);
 		break;
 	case CONNECT_OP:
 	case POSTTXT_OP:
