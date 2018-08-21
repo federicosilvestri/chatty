@@ -74,6 +74,7 @@ bool server_start() {
 	if (consumer_start() == false) {
 		producer_destroy();
 		consumer_destroy();
+		userman_destroy();
 		return false;
 	}
 
@@ -82,6 +83,7 @@ bool server_start() {
 		server_stop();
 		consumer_wait();
 		consumer_destroy();
+		userman_destroy();
 		return false;
 	}
 

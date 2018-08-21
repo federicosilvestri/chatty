@@ -58,7 +58,7 @@ RabbitMQPort = 5672
 RabbitExchange = "test"
 
 # Binding Key
-RabbitBindKey = "
+RabbitBindKey = ""
 
 
  

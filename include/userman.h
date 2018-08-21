@@ -20,6 +20,11 @@ typedef struct {
 	long last_login;
 } userman_user_t;
 
+
+#define USERMAN_GET_ALL 0
+#define USERMAN_GET_ONL 1
+#define USERMAN_GET_OFFL 2
+
 /**
  * Initializes userman.
  * @return true on success, false on error.
@@ -27,10 +32,38 @@ typedef struct {
 bool userman_init();
 
 /**
+ * This function checks if user is already registered or not.
+ * @brief check if user exists
+ * @param nickname of user
+ * @return true if exists, false if not
+ */
+bool userman_user_exists(char*);
+
+/**
+ * This function adds user to system, in case of error a specific
+ * return value will be returned.
+ *
+ * @brief add a new user to system
+ * @param nickname of a new user
+ * @return 0 on success, 1 on already exists, 2 on invalid nickname, 3 on other fatal error
+ */
+int userman_add_user(char*);
+
+/**
+ * This functions returns an array
+ * that contains all registered usernames
+ * Note that array is composed
+ *
+ * @param option an option available ALL, ONL, OFFL
+ * @param string a pointer to string (internally allocated and built)
+ * @return -1 if any error occurs, else the number of the selected user.
+ */
+int userman_get_users(char, char**, int*);
+
+/**
  * Deallocate and destroy userman.
  */
 void userman_destroy();
-
 
 #define USERMAN_H
 #endif /* USERMAN_H */
