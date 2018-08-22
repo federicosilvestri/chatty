@@ -2,10 +2,12 @@ image: ubuntu
 
 build:
   stage: build
-  before_script: 
-     - apt update && apt -y install make gcc valgrind 
+  before_script:
+     - export DEBIAN_FRONTEND=noninteractive
+     - apt update && apt -y install make gcc valgrind doxygen graphviz
   script: 
     - /bin/bash test_build.sh
   artifacts:
     paths:
       - bin
+      - doc/doxygen
