@@ -90,7 +90,7 @@ int userman_add_user(char*);
  * @param string a pointer to string (internally allocated and built)
  * @return -1 if any error occurs, else the number of the selected user.
  */
-int userman_get_users(char, char**);
+size_t userman_get_users(char, char**);
 
 /**
  * Update the status of user: online or offline.

@@ -213,6 +213,10 @@ int userman_add_user(char *nickname) {
 		return 2;
 	}
 
+	if (strlen(nickname) > MAX_NAME_LENGTH) {
+		return 3;
+	}
+
 	// prepare query
 	char *sql_query = calloc(sizeof(char),
 			sizeof(user_insert_query) + strlen(nickname) + 3);
@@ -227,7 +231,7 @@ int userman_add_user(char *nickname) {
 		// cleanup
 		sqlite3_free(err_msg);
 		free(sql_query);
-		return 3;
+		return 4;
 	}
 
 	// cleanup
@@ -236,7 +240,7 @@ int userman_add_user(char *nickname) {
 	return 0;
 }
 
-int userman_get_users(char option, char **list) {
+size_t userman_get_users(char option, char **list) {
 	// query composition (binding)
 	char *sql_ext = NULL;
 
@@ -258,14 +262,14 @@ int userman_get_users(char option, char **list) {
 	default:
 		log_fatal(
 				"Programming error, passed a bad option to userman_get_users");
-		return -1;
+		return 0;
 	}
 
 	sqlite3_stmt *stmt = NULL;
 	int rc = sqlite3_prepare_v2(db, sql_ext, -1, &stmt, NULL);
 	if (rc != SQLITE_OK) {
 		log_fatal("Cannot prepare v2_statement %s", sqlite3_errmsg(db));
-		return -1;
+		return 0;
 	}
 
 	// return value
@@ -303,12 +307,12 @@ int userman_get_users(char option, char **list) {
 				const int s_len = __USERLIST_SIZE(row_count - 1);
 
 				char *p = &((*list)[s_len]);
-				strncpy(p, (char *) nickname, MAX_NAME_LENGTH);
+				strncpy(p, (char *) nickname, MAX_NAME_LENGTH + 1);
 
 			} else {
 				log_fatal(
 						"Unexpected return value from sqlite during user selection");
-				return -1;
+				return 0;
 			}
 		}
 
@@ -319,7 +323,7 @@ int userman_get_users(char option, char **list) {
 	rc = sqlite3_finalize(stmt);
 	free(sql_ext);
 
-	return row_count;
+	return list_size;
 }
 
 bool userman_set_user_status(char *nickname, bool status) {
@@ -327,6 +331,7 @@ bool userman_set_user_status(char *nickname, bool status) {
 		return false;
 	}
 
+	bool ret = true;
 	char *sql = calloc(sizeof(char),
 			sizeof(user_set_status) + 1 + strlen(nickname) + 1);
 	sprintf(sql, user_set_status, status, nickname);
@@ -337,11 +342,16 @@ bool userman_set_user_status(char *nickname, bool status) {
 	if (rc != SQLITE_OK) {
 		log_fatal("Programming error, query execution failed: %s, %s",
 				sql_errmsg, sqlite3_errmsg(db));
+
+		// cleanup error
 		sqlite3_free(sql_errmsg);
-		return false;
+		ret = false;
 	}
 
-	return true;
+	// cleanup query
+	free(sql);
+
+	return ret;
 }
 
 void userman_destroy() {

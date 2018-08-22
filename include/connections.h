@@ -105,5 +105,13 @@ int sendData(long fd, message_data_t *msg);
 
 /* da completare da parte dello studente con eventuali altri metodi di interfaccia */
 
+/**
+ * @brief Invia l'header al client, utilizzato dal server per risposte veloci, bodyless.
+ * @param fd file descriptor sul quale comunicare
+ * @param hdr header da inviare
+ * @return -1 if error, 0 if disconnected, sizeof write if success
+ */
+int sendHeader(int fd, message_hdr_t *hdr);
+
 
 #endif /* CONNECTIONS_H_ */

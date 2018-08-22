@@ -119,21 +119,31 @@ int readData(long connfd, message_data_t *data) {
 	}
 
 	memset(data, 0, sizeof(message_data_t));
-	long int r_size = read((int) connfd, data, sizeof(message_data_t));
+	data->hdr.len = 3;
+	long int dh_size = read((int) connfd, &data->hdr, sizeof(message_data_hdr_t));
 
-	if (r_size <= 0) {
-		return (int) r_size;
+	if (dh_size <= 0) {
+		return (int) dh_size;
 	}
 
 	// read payload
 	data->buf = calloc(sizeof(char), data->hdr.len);
-	long int p_size = read((int) connfd, data->buf, data->hdr.len);
 
-	if (p_size <= 0) {
-		return (int) p_size;
+	size_t to_read = (size_t) data->hdr.len;
+	size_t payload_size = 0;
+
+	while (to_read > 0) {
+		long int t_size = read((int) connfd, data->buf, data->hdr.len);
+		payload_size += (size_t) t_size;
+		to_read -= (size_t) t_size;
 	}
 
-	return (int) (r_size + p_size);
+
+	if (payload_size <= 0) {
+		return (int) payload_size;
+	}
+
+	return (int) (dh_size + (int) payload_size);
 }
 
 /**
@@ -191,7 +201,7 @@ int sendRequest(long fd, message_t *msg) {
 }
 
 /**
- * @brief Invia il body del messaggio al server
+ * @brief Invia il body del messaggio al server, oppure il server al client.
  *
  * @param fd     descrittore della connessione
  * @param msg    puntatore al messaggio da inviare
@@ -203,18 +213,47 @@ int sendData(long fd, message_data_t *msg) {
 		return -1;
 	}
 
-	ssize_t w_size = write((int) fd, msg, sizeof(msg));
+	ssize_t dh_size = write((int) fd, &msg->hdr, sizeof(message_data_hdr_t));
 
-	if (w_size <= 0) {
-		return (int) w_size;
+	if (dh_size <= 0) {
+		return (int) dh_size;
 	}
 
 	// write payload
-	ssize_t p_size = write((int) fd, msg->buf, msg->hdr.len);
+	ssize_t remain_size = msg->hdr.len;
+	ssize_t payload_wrt_size = 0;
 
-	if (p_size <= 0) {
-		return (int) p_size;
+	while (remain_size > 0) {
+		ssize_t written_size = write((int) fd, msg->buf, (size_t) remain_size);
+
+		if (written_size < 0) {
+			return (int) written_size;
+		}
+
+		remain_size -= written_size;
+		payload_wrt_size += written_size;
 	}
 
-	return (int) (w_size + p_size);
+	if (payload_wrt_size <= 0) {
+		return (int) payload_wrt_size;
+	}
+
+	return (int) (dh_size + payload_wrt_size);
 }
+
+/**
+ * @brief Invia l'header al client, utilizzato dal server per risposte veloci, bodyless.
+ * @param fd file descriptor sul quale comunicare
+ * @param hdr header da inviare
+ * @return -1 if error, 0 if disconnected, sizeof write if success
+ */
+int sendHeader(int fd, message_hdr_t *hdr) {
+	if (fd < 0) {
+		return -1;
+	}
+
+	ssize_t w_size = write(fd, hdr, sizeof(hdr));
+
+	return (int) w_size;
+}
+
