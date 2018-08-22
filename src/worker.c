@@ -46,54 +46,20 @@ static void worker_user_list(int index) {
 	message_data_t reply;
 	memset(&reply, 0, sizeof(message_data_t));
 
-	int ss_size;
-
 	reply.buf = NULL;
-	int online_users = userman_get_users(USERMAN_GET_ALL, &reply.buf, &ss_size);
+	int users_n = userman_get_users(USERMAN_GET_ALL, &reply.buf);
 
-	if (online_users <= 0) {
+	if (users_n <= 0) {
 		log_fatal("Error during getting online users");
 		return;
 	}
-	reply.hdr.len = online_users;
+	reply.hdr.len = users_n;
 
 	int w_size = sendData(sockets[index], &reply);
 
 	if (w_size <= 0) {
 		log_warn("Client disconnected without 'thanks', %s", strerror(errno));
 	}
-
-	log_trace("Interpretation of user-list:");
-
-	log_trace("CHECK_MEM4: %c", (MAX_NAME_LENGTH + 1) * (online_users -1));
-//	for (int i = 0, p = 0; i < reply.hdr.len; ++i, p += (MAX_NAME_LENGTH + 1)) {
-//		printf(" %s\n", &reply.buf[p]);
-//	}
-
-	// watching memory
-//	char buff[120];
-//	for (int i = 0, j = 0; i < (MAX_NAME_LENGTH + 1) * online_users; i++, j++) {
-//		buff[j] = reply.buf[i];
-//
-//		if (buff[j] == '\0') {
-//			log_trace("user: %s", buff);
-//			for (int k = 0; k < j; k++) {
-//				buff[j] = '\0';
-//			}
-//		}
-//
-//	}
-
-	log_trace("CHECK MEM4: sizeof(buf) = %d, calculated %d", ss_size, online_users * (MAX_NAME_LENGTH + 1) * sizeof(char));
-
-	log_trace("CHECK MEM5: searching ..0 in the vectorone ");
-	int a = 0;
-	for (int i = 0; i < online_users * (MAX_NAME_LENGTH + 1) * sizeof(char) - 1; i++) {
-		if (reply.buf[i] == '\0') {
-			a++;
-		}
-	}
-	log_trace("CHECK MEM5 result:%d", a);
 
 	free(reply.buf);
 }

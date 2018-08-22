@@ -33,6 +33,8 @@
 #include "controller.h"
 #include "worker.h"
 
+#define __USERLIST_SIZE(X) ((MAX_NAME_LENGTH + 1) * sizeof(char) * (X))
+
 static const char user_insert_query[] =
 		"INSERT INTO USERS (NICKNAME, LAST_LOGIN, ONLINE) "
 				"VALUES ('%s', time('now'), '1')";
@@ -230,9 +232,8 @@ int userman_add_user(char *nickname) {
 	return 0;
 }
 
-int userman_get_users(char option, char **list, int *ss) {
-	// composing query
-
+int userman_get_users(char option, char **list) {
+	// query composition (binding)
 	char *sql_ext = NULL;
 
 	switch (option) {
@@ -266,8 +267,8 @@ int userman_get_users(char option, char **list, int *ss) {
 	// return value
 	int row_count = 0;
 	rc = sqlite3_step(stmt);
-	*list = calloc(sizeof(char), sizeof(char) * (MAX_NAME_LENGTH + 1));
-	size_t list_size = sizeof(char) * (MAX_NAME_LENGTH + 1);
+	*list = calloc(sizeof(char), __USERLIST_SIZE(1));
+	size_t list_size = __USERLIST_SIZE(1);
 
 	while (rc != SQLITE_DONE && rc != SQLITE_OK) {
 		row_count++;
@@ -282,37 +283,25 @@ int userman_get_users(char option, char **list, int *ss) {
 
 				// check if memory is needed
 				if (list_size
-						< (sizeof(char) * row_count * (MAX_NAME_LENGTH + 1))) {
+						< __USERLIST_SIZE(row_count)) {
 					// executing realloc
 					*list = realloc(*list,
-							(sizeof(char) * row_count * (MAX_NAME_LENGTH + 1)));
-					list_size += (sizeof(char) * (MAX_NAME_LENGTH + 1));
+							__USERLIST_SIZE(row_count));
 
-					// initialize memory
-//					memset(*list,
-//							sizeof(char) * (MAX_NAME_LENGTH + 1)
-//									* (row_count - 1), list_size);
+					list_size += __USERLIST_SIZE(1);
 
 					if (*list == NULL) {
 						log_fatal("OUT OF MEMORY");
 						exit(1);
 					}
+
 				}
 
 				// build the list by position
-				const int s_len = sizeof(char) * (MAX_NAME_LENGTH + 1);
+				const int s_len = __USERLIST_SIZE(row_count - 1);
 
-				for (int i = s_len * (row_count - 1), j = 0;
-						j <= strlen((char *) nickname); i++, j++) {
-					if (j == strlen((char *) nickname)) {
-						(*list)[i] = '\0';
-					} else {
-						(*list)[i] = nickname[j];
-					}
-
-					log_trace("[] -> %c", (*list)[i]);
-
-				}
+				char *p = &((*list)[s_len]);
+				strncpy(p, (char *) nickname, MAX_NAME_LENGTH);
 
 			} else {
 				log_fatal(
@@ -326,12 +315,7 @@ int userman_get_users(char option, char **list, int *ss) {
 
 	// it frees the pointers
 	rc = sqlite3_finalize(stmt);
-	*ss = list_size;
-
-	// cleanup
 	free(sql_ext);
-
-	log_trace("Size of list %d", list_size);
 
 	return row_count;
 }
