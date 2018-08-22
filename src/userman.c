@@ -39,17 +39,20 @@ static const char user_insert_query[] =
 		"INSERT INTO users (nickname, last_login, online) "
 				"VALUES ('%s', time('now'), '1')";
 
+static const char user_delete_query[] =
+		"DELETE FROM users WHERE nickname = '%s' LIMIT 1";
+
 static const char user_exists_select_query[] =
 		"SELECT EXISTS (SELECT 1 FROM users"
 				" WHERE nickname='%s' LIMIT 1)";
 
 static const char user_get_query[] = "SELECT nickname FROM users%s";
 
-static const char user_get_query_online[] = " WHERE online = '1'";
+static const char user_get_online_query[] = " WHERE online = '1'";
 
-static const char user_get_query_offline[] = " WHERE online = '0'";
+static const char user_get_offline_query[] = " WHERE online = '0'";
 
-static const char user_set_status[] =
+static const char user_set_status_query[] =
 		"UPDATE users SET online = '%d' WHERE nickname = '%s'";
 
 /**
@@ -205,12 +208,12 @@ bool userman_user_exists(char *nickname) {
 
 int userman_add_user(char *nickname) {
 	// check first if exists
+	if (nickname == NULL) {
+			return 2;
+		}
+
 	if (userman_user_exists(nickname) == true) {
 		return 1;
-	}
-
-	if (nickname == NULL) {
-		return 2;
 	}
 
 	if (strlen(nickname) > MAX_NAME_LENGTH) {
@@ -240,6 +243,39 @@ int userman_add_user(char *nickname) {
 	return 0;
 }
 
+bool userman_delete_user(char *nickname) {
+	// check first if exists
+	if (nickname == NULL) {
+		return false;
+	}
+
+	if (userman_user_exists(nickname) == false) {
+		return false;
+	}
+
+	// prepare query
+	char *sql_query = calloc(sizeof(char),
+			sizeof(user_delete_query) + strlen(nickname) + 3);
+
+	sprintf(sql_query, user_delete_query, nickname);
+
+	char *err_msg = NULL;
+	int rc = sqlite3_exec(db, sql_query, NULL, 0, &err_msg);
+
+	if (rc != SQLITE_OK) {
+		log_fatal("SQL error: %s", err_msg);
+		// cleanup
+		sqlite3_free(err_msg);
+		free(sql_query);
+		return false;
+	}
+
+	// cleanup
+	free(sql_query);
+
+	return true;
+}
+
 size_t userman_get_users(char option, char **list) {
 	// query composition (binding)
 	char *sql_ext = NULL;
@@ -251,13 +287,13 @@ size_t userman_get_users(char option, char **list) {
 		break;
 	case USERMAN_GET_ONL:
 		sql_ext = calloc(sizeof(char),
-				sizeof(user_get_query) + sizeof(user_get_query_online));
-		sprintf(sql_ext, user_get_query, user_get_query_online);
+				sizeof(user_get_query) + sizeof(user_get_online_query));
+		sprintf(sql_ext, user_get_query, user_get_online_query);
 		break;
 	case USERMAN_GET_OFFL:
 		sql_ext = calloc(sizeof(char),
-				sizeof(user_get_query) + sizeof(user_get_query_offline));
-		sprintf(sql_ext, user_get_query, user_get_query_offline);
+				sizeof(user_get_query) + sizeof(user_get_offline_query));
+		sprintf(sql_ext, user_get_query, user_get_offline_query);
 		break;
 	default:
 		log_fatal(
@@ -333,8 +369,8 @@ bool userman_set_user_status(char *nickname, bool status) {
 
 	bool ret = true;
 	char *sql = calloc(sizeof(char),
-			sizeof(user_set_status) + 1 + strlen(nickname) + 1);
-	sprintf(sql, user_set_status, status, nickname);
+			sizeof(user_set_status_query) + 1 + strlen(nickname) + 1);
+	sprintf(sql, user_set_status_query, status, nickname);
 
 	char *sql_errmsg;
 	int rc = sqlite3_exec(db, sql, NULL, 0, &sql_errmsg);

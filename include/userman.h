@@ -82,6 +82,15 @@ bool userman_user_exists(char*);
 int userman_add_user(char*);
 
 /**
+ * This function will delete a user from system, in case of
+ * error a specific return value will be returned.
+ *
+ * @param nickname that identifies user to delete
+ * @return true on success, false on error
+ */
+bool userman_delete_user(char*);
+
+/**
  * This functions returns an array
  * that contains all registered usernames
  * Note that array is composed

@@ -49,12 +49,24 @@ static short int check_header(message_hdr_t *hdr) {
 	return 0;
 }
 
-static void worker_user_list(int index, message_t *msg) {
+static void worker_user_list(int index, message_t *msg, bool ack, char type) {
+	// if ack is set to ok, it sends ack message
+	if (ack == true) {
+		message_hdr_t reply_hdr;
+		prepare_header(&reply_hdr);
+
+		reply_hdr.op = OP_OK;
+		if (sendHeader(sockets[index], &reply_hdr) <= 0) {
+			log_error("Cannot send ACK to client");
+			return;
+		}
+	}
+
 	message_data_t reply;
 	prepare_data(&reply, msg->hdr.sender);
 
 	reply.buf = NULL;
-	size_t list_size = userman_get_users(USERMAN_GET_ALL, &reply.buf);
+	size_t list_size = userman_get_users(type, &reply.buf);
 
 	if (list_size <= 0) {
 		log_fatal("Error during getting online users");
@@ -99,7 +111,7 @@ static void worker_register_user(int index, message_t *msg) {
 
 	if (reg_status == 0) {
 		// we need now to send the user list
-		worker_user_list(index, msg);
+		worker_user_list(index, msg, false, USERMAN_GET_ONL);
 	}
 }
 
@@ -108,30 +120,21 @@ static void worker_deregister_user(int index, message_t *msg) {
 	prepare_header(&hdr_reply);
 
 	log_trace("DEregistering user");
-	int dereg_status = 0; // userman_delete_user(msg.hdr.sender);
+	bool dereg_status = userman_delete_user(msg->hdr.sender);
 
-	switch (dereg_status) {
-	case 0:
+	if (dereg_status == true) {
+
 		hdr_reply.op = OP_OK;
 		log_info("User DEregistered successfully");
-		break;
-	case 1:
-		hdr_reply.op = OP_NICK_UNKNOWN;
-		log_info("Cannot DEregister user, nickname is not registered");
-		break;
-	default:
-		log_error("User DEregistration failed, return value: %d", dereg_status);
+	} else {
+		log_error("User DEregistration failed, maybe user does not exist");
 		hdr_reply.op = OP_FAIL;
-		break;
 	}
 
 	if (sendHeader(sockets[index], &hdr_reply) <= 0) {
 		log_error("Cannot send to socket, %s", strerror(errno));
 	}
-
-	msg->hdr.sender[0] = 's';
 }
-
 
 static inline void worker_disconnect_user(int index, message_t *msg) {
 	// update status to userman
@@ -143,19 +146,28 @@ static inline void worker_disconnect_user(int index, message_t *msg) {
 }
 
 static inline void worker_connect_user(int index, message_t *msg) {
+	message_hdr_t reply;
+	prepare_header(&reply);
+
 	// first check if user exists
 	if (userman_user_exists(msg->hdr.sender) == true) {
 		// connect it
-		if (userman_set_user_status(msg->hdr.sender, USERMAN_STATUS_ONL) == false) {
+		if (userman_set_user_status(msg->hdr.sender,
+		USERMAN_STATUS_ONL) == false) {
 			log_fatal("Cannot set user status due to previous error!");
 			return;
 		}
-		// user connected
+		// user connected, send ACK
+		reply.op = OP_OK;
+
+		if (sendHeader(sockets[index], &reply) <= 0) {
+			log_error("Cannot send reply to client!");
+		}
+
+		// send user list
+		worker_user_list(index, msg, false, USERMAN_GET_ONL);
 	} else {
 		// user is not registered, write back response
-		message_hdr_t reply;
-		prepare_header(&reply);
-
 		reply.op = OP_NICK_UNKNOWN;
 
 		if (sendHeader(sockets[index], &reply) <= 0) {
@@ -185,9 +197,12 @@ static int worker_action_router(int index, message_t *msg) {
 	case POSTFILE_OP:
 	case GETFILE_OP:
 	case GETPREVMSGS_OP:
-	case USRLIST_OP:
 		log_fatal("NOT IMPLEMENTED ACTIONS");
 		ret = -1;
+		break;
+	case USRLIST_OP:
+		worker_user_list(index, msg, true, USERMAN_GET_ONL);
+		ret = 0;
 		break;
 	case UNREGISTER_OP:
 		worker_deregister_user(index, msg);
@@ -224,6 +239,20 @@ void worker_run(amqp_message_t message) {
 	read_size = readMsg(sockets[index], &msg);
 
 	if (read_size == 0) {
+		/*
+		 *
+		 * To not leave the status of user to online status we
+		 * need to implement an array that contains all nicknames with
+		 * the size of max-connection
+		 * each element identify the nickname connect at the socket.
+		 *
+		 *   sockets sockets_block sockets_cln_nick
+		 * 0   3         false           pippo
+		 * 1   2          true            NULL (if no user)
+		 * 2
+		 *
+		 *
+		 */
 		producer_disconnect_host(index);
 		// no other operation are possible on socket.
 		return;
@@ -245,7 +274,7 @@ void worker_run(amqp_message_t message) {
 		break;
 	case 0:
 		// success, release the socket
-		worker_disconnect_user(index, &msg);
+		producer_unlock_socket(index);
 		// no other operation are possible on socket.
 		break;
 	case 1:
