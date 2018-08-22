@@ -57,4 +57,23 @@ void producer_disconnect_host(int);
  */
 void producer_unlock_socket(int);
 
+/**
+ * This function set the connected user to the current fd.
+ * It is useful to disconnect dead clients.
+ *
+ * @param index of socket
+ * @param nickname of socket, NULL if you want to disconnect
+ */
+void producer_set_fd_nickname(int, char*);
+
+/**
+ * This function copy the nickname associated to fd
+ * in the passed string pointer.
+ * Remember to free pointer after initialization.
+ *
+ * @param socket index
+ * @param pointer to string
+ */
+void producer_get_fd_nickname(int, char**);
+
 #endif /* PRODUCER_H */

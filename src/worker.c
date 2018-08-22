@@ -157,7 +157,11 @@ static inline void worker_connect_user(int index, message_t *msg) {
 			log_fatal("Cannot set user status due to previous error!");
 			return;
 		}
-		// user connected, send ACK
+
+		// user connected, set to the cache
+		producer_set_fd_nickname(index, msg->hdr.sender);
+
+		// send ACK
 		reply.op = OP_OK;
 
 		if (sendHeader(sockets[index], &reply) <= 0) {
@@ -253,7 +257,22 @@ void worker_run(amqp_message_t message) {
 		 *
 		 *
 		 */
-		producer_disconnect_host(index);
+		// try to recover from session
+		char *nickname = NULL;
+		producer_get_fd_nickname(index, &nickname);
+		log_debug("Try to retrieve nickname from session");
+		if (nickname == NULL) {
+			// cache does not contains user nickname, disconnect brutally
+			producer_disconnect_host(index);
+			log_debug("Nickname not found... disconnected brutally");
+		} else {
+			// compose the header
+			strcpy(msg.hdr.sender, nickname);
+			log_debug("Nickname found=%s, disconnected normally", nickname);
+			free(nickname);
+			worker_disconnect_user(index, &msg);
+		}
+
 		// no other operation are possible on socket.
 		return;
 	}

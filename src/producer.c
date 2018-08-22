@@ -25,9 +25,10 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
-
 #include <amqp.h>
 #include <amqp_tcp_socket.h>
+
+#include "message.h"
 
 #include "controller.h"
 #include "config.h"
@@ -54,6 +55,12 @@ int *sockets;
  * is in use or not.
  */
 bool *sockets_block;
+
+/**
+ * Array (partially dynamically allocated) that contains a
+ * string value of user that is connected to the current socket.
+ */
+char **sockets_cu_nick;
 
 pthread_mutex_t socket_mutex;
 
@@ -95,8 +102,38 @@ void producer_disconnect_host(int index) {
 	int fd = sockets[index];
 	close(sockets[index]);
 	sockets[index] = 0;
+	producer_set_fd_nickname(index, NULL);
 	producer_unlock_socket(index);
-	log_info("Host %d DISCONNECTED",fd);
+	log_info("Host %d DISCONNECTED", fd);
+}
+
+void producer_set_fd_nickname(int index, char *nickname) {
+	if (index < 0 || index > max_connections) {
+		log_fatal("Programming error, cannot set an invalid index of socket");
+		return;
+	}
+
+	pthread_mutex_lock(&socket_mutex);
+	if (nickname == NULL) {
+		sockets_cu_nick[index][0] = '\0';
+	} else {
+		strcpy(sockets_cu_nick[index], nickname);
+	}
+	pthread_mutex_unlock(&socket_mutex);
+}
+
+void producer_get_fd_nickname(int index, char **nickname) {
+	if (nickname == NULL) {
+		log_fatal("You cannot pass a null pointer!");
+		return;
+	}
+
+	pthread_mutex_lock(&socket_mutex);
+	if (sockets_cu_nick[index][0] != '\0') {
+		*nickname = calloc(sizeof(char), sizeof(char) * (MAX_NAME_LENGTH + 1));
+		strcpy(*nickname, sockets_cu_nick[index]);
+	}
+	pthread_mutex_unlock(&socket_mutex);
 }
 
 /**
@@ -169,10 +206,15 @@ static bool producer_socket_init() {
 
 	// initialize client socket
 	sockets = malloc(sizeof(int) * ((long unsigned int) max_connections));
-	sockets_block = malloc(sizeof(bool) * ((long unsigned int) max_connections));
+	sockets_block = malloc(
+			sizeof(bool) * ((long unsigned int) max_connections));
+	sockets_cu_nick = malloc(
+			sizeof(char*) * ((long unsigned int) max_connections));
+
 	for (int i = 0; i < max_connections; i++) {
 		sockets[i] = 0;
 		sockets_block[i] = false;
+		sockets_cu_nick[i] = calloc(sizeof(char), sizeof(char) * (MAX_NAME_LENGTH + 1));
 	}
 
 	return true;
@@ -432,4 +474,10 @@ void producer_destroy() {
 	log_debug("Destroying sockets array");
 	free(sockets);
 	free(sockets_block);
+	// free the sockets nicks matrix
+	for (int i = 0; i < max_connections; i++) {
+		free(sockets_cu_nick[i]);
+	}
+	free(sockets_cu_nick);
+
 }

@@ -37,7 +37,7 @@
 
 static const char user_insert_query[] =
 		"INSERT INTO users (nickname, last_login, online) "
-				"VALUES ('%s', time('now'), '1')";
+				"VALUES ('%s', time('now'), '0')";
 
 static const char user_delete_query[] =
 		"DELETE FROM users WHERE nickname = '%s' LIMIT 1";
