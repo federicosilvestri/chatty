@@ -33,20 +33,24 @@
 #include "controller.h"
 #include "worker.h"
 
-#define __USERLIST_SIZE(X) ((MAX_NAME_LENGTH + 1) * sizeof(char) * (X))
+#define __USERLIST_SIZE(X) ((size_t)((MAX_NAME_LENGTH + 1) * ((int) sizeof(char)) * (X)))
 
 static const char user_insert_query[] =
-		"INSERT INTO USERS (NICKNAME, LAST_LOGIN, ONLINE) "
+		"INSERT INTO users (nickname, last_login, online) "
 				"VALUES ('%s', time('now'), '1')";
 
 static const char user_exists_select_query[] =
-		"SELECT EXISTS (SELECT 1 FROM USERS"
-				" WHERE NICKNAME='%s' LIMIT 1)";
+		"SELECT EXISTS (SELECT 1 FROM users"
+				" WHERE nickname='%s' LIMIT 1)";
 
-static const char user_get_query[] = "SELECT NICKNAME FROM USERS%s";
+static const char user_get_query[] = "SELECT nickname FROM users%s";
 
-static const char user_get_query_online[] = " WHERE ONLINE = '1'";
-static const char user_get_query_offline[] = " WHERE ONLINE = '0'";
+static const char user_get_query_online[] = " WHERE online = '1'";
+
+static const char user_get_query_offline[] = " WHERE online = '0'";
+
+static const char user_set_status[] =
+		"UPDATE users SET online = '%d' WHERE nickname = '%s'";
 
 /**
  * External configuration struct from config
@@ -65,10 +69,10 @@ static sqlite3 *db;
 
 static bool userman_create_db() {
 	// creating table
-	const char sql[] = "CREATE TABLE USERS("
-			"NICKNAME CHAR(120) PRIMARY KEY     NOT NULL,"
-			"LAST_LOGIN         DATETIME,"
-			"ONLINE 			INTEGER );";
+	const char sql[] = "CREATE TABLE users("
+			"nickname CHAR(120) PRIMARY KEY     NOT NULL,"
+			"last_login         DATETIME,"
+			"online 			INTEGER );";
 	char *err_msg = NULL;
 
 	int rc = sqlite3_exec(db, sql, NULL, 0, &err_msg);
@@ -282,11 +286,9 @@ int userman_get_users(char option, char **list) {
 						colIndex);
 
 				// check if memory is needed
-				if (list_size
-						< __USERLIST_SIZE(row_count)) {
+				if (list_size < __USERLIST_SIZE(row_count)) {
 					// executing realloc
-					*list = realloc(*list,
-							__USERLIST_SIZE(row_count));
+					*list = realloc(*list, __USERLIST_SIZE(row_count));
 
 					list_size += __USERLIST_SIZE(1);
 
@@ -318,6 +320,28 @@ int userman_get_users(char option, char **list) {
 	free(sql_ext);
 
 	return row_count;
+}
+
+bool userman_set_user_status(char *nickname, bool status) {
+	if (nickname == NULL) {
+		return false;
+	}
+
+	char *sql = calloc(sizeof(char),
+			sizeof(user_set_status) + 1 + strlen(nickname) + 1);
+	sprintf(sql, user_set_status, status, nickname);
+
+	char *sql_errmsg;
+	int rc = sqlite3_exec(db, sql, NULL, 0, &sql_errmsg);
+
+	if (rc != SQLITE_OK) {
+		log_fatal("Programming error, query execution failed: %s, %s",
+				sql_errmsg, sqlite3_errmsg(db));
+		sqlite3_free(sql_errmsg);
+		return false;
+	}
+
+	return true;
 }
 
 void userman_destroy() {

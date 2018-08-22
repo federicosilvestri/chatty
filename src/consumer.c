@@ -51,8 +51,10 @@ bool consumer_init() {
 		return false;
 	}
 
-	consumer_threads = malloc(sizeof(pthread_t) * consumer_threads_n);
-	consumer_threads_ids = malloc(sizeof(unsigned int) * consumer_threads_n);
+	consumer_threads = malloc(
+			sizeof(pthread_t) * ((long unsigned int) consumer_threads_n));
+	consumer_threads_ids = malloc(
+			sizeof(unsigned int) * ((long unsigned int) consumer_threads_n));
 
 	for (int i = 0; i < consumer_threads_n; i++) {
 		consumer_threads_ids[i] = i;
@@ -141,7 +143,7 @@ static void consumer_run_wait(amqp_connection_state_t conn, int tid) {
 
 static void *consumer_run(void *index_addr) {
 	// thread identification
-	const int id = *((unsigned int *) index_addr);
+	const int id = *((int *) index_addr);
 
 	// RabbitMQ connection
 	amqp_socket_t *c_socket = NULL;

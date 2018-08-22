@@ -115,7 +115,7 @@ static bool producer_socket_init() {
 		return false;
 	}
 
-	int unix_path_length = strlen(socket_unix_path);
+	size_t unix_path_length = strlen(socket_unix_path);
 	if (unix_path_length > 107) {
 		log_error(
 				"Length of 'UnixPath' parameter is greater than 107 character.");
@@ -168,8 +168,8 @@ static bool producer_socket_init() {
 	}
 
 	// initialize client socket
-	sockets = malloc(sizeof(int) * max_connections);
-	sockets_block = malloc(sizeof(bool) * max_connections);
+	sockets = malloc(sizeof(int) * ((long unsigned int) max_connections));
+	sockets_block = malloc(sizeof(bool) * ((long unsigned int) max_connections));
 	for (int i = 0; i < max_connections; i++) {
 		sockets[i] = 0;
 		sockets_block[i] = false;
@@ -331,7 +331,7 @@ static inline void run_cleanup() {
  *
  * @param params parameters of standard routine thread
  */
-static void *producer_run(void* params) {
+static void *producer_run() {
 	log_debug("[PRODUCER THREAD] started");
 
 // set blocking signals for select

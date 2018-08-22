@@ -31,11 +31,6 @@
  */
 extern config_t server_conf;
 
-typedef struct {
-	int fd;
-	char *message;
-} worker_message_t;
-
 /**
  * Initialize and check if server can be started or not.
  * For example if the current AF_UNIX socket file exists,

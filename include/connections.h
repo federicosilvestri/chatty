@@ -59,11 +59,11 @@ int readHeader(long connfd, message_hdr_t *hdr);
 /**
  * @brief Legge il body del messaggio
  *
- * @param fd     descrittore della connessione
- * @param data   puntatore al body del messaggio
+ * @param fd descrittore della connessione
+ * @param data puntatore al body del messaggio
  *
  * @return <=0 se c'e' stato un errore
- *         (se <0 errno deve essere settato, se == 0 connessione chiusa) 
+ *         (se <0 errno deve essere settato, se == 0 connessione chiusa)
  */
 int readData(long fd, message_data_t *data);
 

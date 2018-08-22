@@ -53,7 +53,8 @@ static void worker_user_list(int index) {
 		log_fatal("Error during getting online users");
 		return;
 	}
-	reply.hdr.len = users_n;
+
+	reply.hdr.len = (unsigned int) users_n;
 
 	int w_size = sendData(sockets[index], &reply);
 
@@ -96,6 +97,15 @@ static void worker_register_user(int index, message_t msg) {
 	}
 }
 
+static void worker_disconnect_user(int index, message_t msg) {
+	// update status to userman
+	if (userman_set_user_status(msg.hdr.sender, USERMAN_STATUS_OFFL) == false) {
+		log_fatal("Cannot set user offline due to previous errors!");
+	}
+
+	producer_disconnect_host(index);
+}
+
 static int worker_action_router(int index, message_t msg) {
 	switch (msg.hdr.op) {
 	case REGISTER_OP:
@@ -109,8 +119,11 @@ static int worker_action_router(int index, message_t msg) {
 	case GETPREVMSGS_OP:
 	case USRLIST_OP:
 	case UNREGISTER_OP:
-	case DISCONNECT_OP:
 		log_fatal("NOT IMPLEMENTED ACTIONS");
+		break;
+	case DISCONNECT_OP:
+		worker_disconnect_user(index, msg);
+		return 2;
 		break;
 	case CREATEGROUP_OP:
 	case ADDGROUP_OP:
@@ -155,8 +168,10 @@ void worker_run(amqp_message_t message) {
 		// grave problem
 		producer_disconnect_host(index);
 		return;
+	} else if (ra_ret == 2) {
+		// user is already disconnected
+	} else {
+		producer_unlock_socket(index);
+		// no other operation are possible on socket.
 	}
-
-	producer_unlock_socket(index);
-	// no other operation are possible on socket.
 }

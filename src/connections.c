@@ -9,6 +9,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -33,17 +34,17 @@ int openConnection(char* path, unsigned int ntimes, unsigned int secs) {
 	sleeping = (secs < MAX_SLEEPING) ? secs : MAX_SLEEPING;
 
 	// first check if file exists
-	int stop = 0;
-	for (int i = 0; i < ntimes && stop == 0; i++) {
+	bool stop = false;
+	for (unsigned int i = 0; i < ntimes && stop == false; i++) {
 		if (access(path, F_OK) == -1) {
 			// file does not exist
 			sleep(sleeping);
 		} else {
-			stop = 1;
+			stop = true;
 		}
 	}
 
-	if (stop == 0) {
+	if (stop == false) {
 		errno = ENOENT;
 		return -1;
 	}
@@ -97,9 +98,9 @@ int readHeader(long connfd, message_hdr_t *hdr) {
 	}
 
 	memset(hdr, 0, sizeof(message_hdr_t));
-	int read_size = read(connfd, hdr, sizeof(message_hdr_t));
+	ssize_t read_size = read((int) connfd, hdr, sizeof(message_hdr_t));
 
-	return read_size;
+	return (int) read_size;
 }
 
 /**
@@ -118,21 +119,21 @@ int readData(long connfd, message_data_t *data) {
 	}
 
 	memset(data, 0, sizeof(message_data_t));
-	int r_size = read(connfd, data, sizeof(message_data_t));
+	long int r_size = read((int) connfd, data, sizeof(message_data_t));
 
 	if (r_size <= 0) {
-		return r_size;
+		return (int) r_size;
 	}
 
 	// read payload
 	data->buf = calloc(sizeof(char), data->hdr.len);
-	int p_size = read(connfd, data->buf, data->hdr.len);
+	long int p_size = read((int) connfd, data->buf, data->hdr.len);
 
 	if (p_size <= 0) {
-		return p_size;
+		return (int) p_size;
 	}
 
-	return r_size + p_size;
+	return (int) (r_size + p_size);
 }
 
 /**
@@ -154,11 +155,11 @@ int readMsg(long connfd, message_t *msg) {
 	memset(msg, 0, sizeof(message_t));
 
 	// reading
-	int read_size = read(connfd, msg, sizeof(message_t));
+	long int read_size = read((int) connfd, msg, sizeof(message_t));
 
 	// checking
 	if (read_size <= 0) {
-		return read_size;
+		return (int) read_size;
 	}
 
 	return 1;
@@ -180,7 +181,7 @@ int sendRequest(long fd, message_t *msg) {
 		return -1;
 	}
 
-	int w_size = write(fd, msg, sizeof(message_t));
+	ssize_t w_size = write((int) fd, msg, sizeof(message_t));
 
 	if (w_size <= 0) {
 		return -1;
@@ -202,18 +203,18 @@ int sendData(long fd, message_data_t *msg) {
 		return -1;
 	}
 
-	int w_size = write(fd, msg, sizeof(msg));
+	ssize_t w_size = write((int) fd, msg, sizeof(msg));
 
 	if (w_size <= 0) {
-		return w_size;
+		return (int) w_size;
 	}
 
 	// write payload
-	int p_size = write(fd, msg->buf, msg->hdr.len);
+	ssize_t p_size = write((int) fd, msg->buf, msg->hdr.len);
 
 	if (p_size <= 0) {
-		return p_size;
+		return (int) p_size;
 	}
 
-	return w_size + p_size;
+	return (int) (w_size + p_size);
 }

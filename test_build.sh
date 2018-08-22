@@ -42,3 +42,7 @@ make deps
 
 echo "Making chatty"
 make chatty
+
+echo "Making docs"
+cd ..
+doxygen

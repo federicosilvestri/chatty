@@ -145,6 +145,9 @@ bool check_arguments(int argc, char *argv[]) {
 	return true;
 }
 
+/**
+ * Clean the workspace used by chatty
+ */
 void clean_workspace() {
 	config_clean();
 	log_destroy();

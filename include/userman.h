@@ -16,14 +16,46 @@
  * for user.
  */
 typedef struct {
+	/**
+	 * Username of registered user.
+	 */
 	char *username;
+	/**
+	 * A timestamp format of last login.
+	 */
 	long last_login;
 } userman_user_t;
 
 
+/**
+ * Constant for user list function.
+ * This option will tell function to return all users.
+ */
 #define USERMAN_GET_ALL 0
+
+/**
+ * Constant for user list function.
+ * This option will tell function to return only online users.
+ */
 #define USERMAN_GET_ONL 1
+
+/**
+ * Constant for user list function.
+ * This option will tell function to return only offline users.
+ */
 #define USERMAN_GET_OFFL 2
+
+/**
+ * Constant for user set status function.
+ * This option will set user in online status
+ */
+#define USERMAN_STATUS_ONL true
+
+/**
+ * Constant for user set status function.
+ * This option will set user in offline status
+ */
+#define USERMAN_STATUS_OFFL false
 
 /**
  * Initializes userman.
@@ -59,6 +91,15 @@ int userman_add_user(char*);
  * @return -1 if any error occurs, else the number of the selected user.
  */
 int userman_get_users(char, char**);
+
+/**
+ * Update the status of user: online or offline.
+ *
+ * @param nickname the nickname which is online
+ * @param status set true if online, false if offline
+ * @return false in case of error, true in case of success
+ */
+bool userman_set_user_status(char*, bool);
 
 /**
  * Deallocate and destroy userman.

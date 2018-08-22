@@ -6,16 +6,29 @@
  * originale dell'autore.
  *******************************************************************************/
 
-#ifndef SIGNAL_HANDLER_H_
-#define SIGNAL_HANDLER_H_
+/**
+ * @file signal_manager.h contains signal manager definitions.
+ */
+
+#ifndef SIGNAL_MANAGER_H_
+#define SIGNAL_MANAGER_H_
 
 #include <stdbool.h>
 
+/*
+ * Make Eclipse Happy
+ */
+#ifndef SIG_BLOCK
+/**
+ * Signal block definition
+ */
+#define SIG_BLOCK 1
+#endif
+
 /**
  * This function registers a signal as blocked signals.
- * @example if you register SIGINT, it will be ignored if received but managed by wait_signal.
- *
  * If any errors occurs function will print it.
+ *
  * @return false in case of error
  */
 bool signal_manager_register();
@@ -33,4 +46,4 @@ int signal_manager_wait();
  */
 void signal_manager_destroy();
 
-#endif /* SIGNAL_HANDLER_H_ */
+#endif /* SIGNAL_MANAGER_H_ */

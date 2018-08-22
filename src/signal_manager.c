@@ -7,7 +7,7 @@
  *******************************************************************************/
 
 /**
- * @file signal_handler.h signal management header file.
+ * @file signal_manager.c signal management header file.
  * @brief it manages all signals triggered by system.
  */
 
@@ -24,7 +24,6 @@
 #include <assert.h>
 #include <string.h>
 #include <pthread.h>
-#include <stdbool.h>
 #include <errno.h>
 #include <sys/signal.h>
 
@@ -57,7 +56,7 @@ bool signal_manager_register() {
 	}
 
 	// adding signals
-	for (int i = 0; i < sizeof(signals) / sizeof(const int); i++) {
+	for (unsigned int i = 0; i < sizeof(signals) / sizeof(const int); i++) {
 		if (sigaddset(&signal_set, signals[i]) == -1) {
 			log_fatal("Cannot add signal to signals set");
 			return false;
