@@ -98,7 +98,20 @@ int readHeader(long connfd, message_hdr_t *hdr) {
 	}
 
 	memset(hdr, 0, sizeof(message_hdr_t));
-	ssize_t read_size = read((int) connfd, hdr, sizeof(message_hdr_t));
+
+	ssize_t to_read = sizeof(message_hdr_t);
+	ssize_t read_size = 0;
+
+	while (to_read > 0) {
+		ssize_t read_bytes = read((int) connfd, hdr, (size_t) to_read);
+
+		if (read_bytes <= 0) {
+			return (int) read_bytes;
+		}
+
+		to_read -= read_bytes;
+		read_size += read_bytes;
+	}
 
 	return (int) read_size;
 }
@@ -118,32 +131,37 @@ int readData(long connfd, message_data_t *data) {
 		return -1;
 	}
 
+	long int data_hdr_size = 0;
+	long int data_payload_size = 0;
+
 	memset(data, 0, sizeof(message_data_t));
-	data->hdr.len = 3;
-	long int dh_size = read((int) connfd, &data->hdr, sizeof(message_data_hdr_t));
 
-	if (dh_size <= 0) {
-		return (int) dh_size;
+	data_hdr_size = read((int) connfd, &data->hdr, sizeof(message_data_hdr_t));
+
+	if (data_hdr_size <= 0) {
+		return (int) data_hdr_size;
 	}
 
-	// read payload
-	data->buf = calloc(sizeof(char), data->hdr.len);
+	// read payload, if necessary
+	if (data->hdr.len > 0) {
+		data->buf = calloc(sizeof(char), data->hdr.len);
+		unsigned int to_read = data->hdr.len;
 
-	size_t to_read = (size_t) data->hdr.len;
-	size_t payload_size = 0;
+		while (to_read > 0) {
+			long int t_size = read((int) connfd, data->buf, data->hdr.len);
 
-	while (to_read > 0) {
-		long int t_size = read((int) connfd, data->buf, data->hdr.len);
-		payload_size += (size_t) t_size;
-		to_read -= (size_t) t_size;
+			if (t_size < 0) {
+				// error
+				return (int) t_size;
+			}
+
+			data_payload_size += t_size;
+			to_read -= (unsigned int) t_size;
+		}
+
 	}
 
-
-	if (payload_size <= 0) {
-		return (int) payload_size;
-	}
-
-	return (int) (dh_size + (int) payload_size);
+	return (int) (data_hdr_size + data_payload_size);
 }
 
 /**
@@ -161,18 +179,26 @@ int readMsg(long connfd, message_t *msg) {
 		return -1;
 	}
 
+	int h_size = 0;
+	int p_size = 0;
+
 	// initialize message
 	memset(msg, 0, sizeof(message_t));
 
-	// reading
-	long int read_size = read((int) connfd, msg, sizeof(message_t));
-
-	// checking
-	if (read_size <= 0) {
-		return (int) read_size;
+	// read header
+	h_size = readHeader(connfd, &msg->hdr);
+	if (h_size <= 0) {
+		return h_size;
 	}
 
-	return 1;
+	// read data
+	p_size = readData(connfd, &msg->data);
+
+	if (p_size <= 0) {
+		return p_size;
+	}
+
+	return (h_size + p_size);
 }
 
 /* da completare da parte dello studente con altri metodi di interfaccia */
@@ -191,13 +217,24 @@ int sendRequest(long fd, message_t *msg) {
 		return -1;
 	}
 
-	ssize_t w_size = write((int) fd, msg, sizeof(message_t));
+	int h_size = 0;
+	int p_size = 0;
 
-	if (w_size <= 0) {
-		return -1;
+	// writing header of message
+	h_size = sendHeader((int) fd, &msg->hdr);
+
+	if (h_size <= 0) {
+		return h_size;
 	}
 
-	return 0;
+	// writing data
+	p_size = sendData(fd, &msg->data);
+
+	if (p_size <= 0) {
+		return p_size;
+	}
+
+	return (h_size + p_size);
 }
 
 /**
@@ -213,16 +250,18 @@ int sendData(long fd, message_data_t *msg) {
 		return -1;
 	}
 
-	ssize_t dh_size = write((int) fd, &msg->hdr, sizeof(message_data_hdr_t));
+	// read header, first
+	ssize_t dh_size = 0;
+	dh_size = write((int) fd, &msg->hdr, sizeof(message_data_hdr_t));
 
-	if (dh_size <= 0) {
+	if (dh_size <= 0 || msg->hdr.len == 0) {
 		return (int) dh_size;
 	}
 
-	// write payload
-	ssize_t remain_size = msg->hdr.len;
 	ssize_t payload_wrt_size = 0;
 
+	// write payload
+	ssize_t remain_size = msg->hdr.len;
 	while (remain_size > 0) {
 		ssize_t written_size = write((int) fd, msg->buf, (size_t) remain_size);
 
@@ -252,7 +291,19 @@ int sendHeader(int fd, message_hdr_t *hdr) {
 		return -1;
 	}
 
-	ssize_t w_size = write(fd, hdr, sizeof(hdr));
+	ssize_t to_write = sizeof(message_hdr_t);
+	ssize_t w_size = 0;
+
+	while (to_write > 0) {
+		ssize_t written_size = write(fd, hdr, (size_t) to_write);
+
+		if (written_size < 0) {
+			return (int) written_size;
+		}
+
+		w_size += written_size;
+		to_write -= written_size;
+	}
 
 	return (int) w_size;
 }

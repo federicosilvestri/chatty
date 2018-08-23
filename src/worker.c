@@ -182,6 +182,13 @@ static inline void worker_connect_user(int index, message_t *msg) {
 	}
 }
 
+static void worker_posttxt(int index, message_t *msg) {
+	// send ack
+	index=msg->hdr.op;
+	index++;
+
+}
+
 static int worker_action_router(int index, message_t *msg) {
 	int ret;
 
@@ -197,6 +204,9 @@ static int worker_action_router(int index, message_t *msg) {
 		ret = 0;
 		break;
 	case POSTTXT_OP:
+		worker_posttxt(index, msg);
+		ret = 0;
+		break;
 	case POSTTXTALL_OP:
 	case POSTFILE_OP:
 	case GETFILE_OP:
@@ -245,15 +255,15 @@ void worker_run(amqp_message_t message) {
 	if (read_size == 0) {
 		/*
 		 *
-		 * To not leave the status of user to online status we
-		 * need to implement an array that contains all nicknames with
+		 * To not leave the status of user to online status I have
+		 * implemented an array that contains all nicknames with
 		 * the size of max-connection
 		 * each element identify the nickname connect at the socket.
 		 *
-		 *   sockets sockets_block sockets_cln_nick
-		 * 0   3         false           pippo
-		 * 1   2          true            NULL (if no user)
-		 * 2
+		 * index  sockets  sockets_block   sockets_cln_nick
+		 * 0         3         false          pippo
+		 * 1         2          true          NULL (if no user)
+		 * 2		...			....		  ...
 		 *
 		 *
 		 */
@@ -285,6 +295,11 @@ void worker_run(amqp_message_t message) {
 	}
 
 	int ra_ret = worker_action_router(index, &msg);
+
+	// cleanup
+	if (msg.data.buf != NULL) {
+		free(msg.data.buf);
+	}
 
 	switch (ra_ret) {
 	case -1:

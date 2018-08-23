@@ -35,6 +35,11 @@
 
 #define __USERLIST_SIZE(X) ((size_t)((MAX_NAME_LENGTH + 1) * ((int) sizeof(char)) * (X)))
 
+static const char create_db_sql[] = "CREATE TABLE users("
+		"nickname CHAR(120) PRIMARY KEY     NOT NULL,"
+		"last_login         DATETIME,"
+		"online 			INTEGER );";
+
 static const char user_insert_query[] =
 		"INSERT INTO users (nickname, last_login, online) "
 				"VALUES ('%s', time('now'), '0')";
@@ -72,13 +77,9 @@ static sqlite3 *db;
 
 static bool userman_create_db() {
 	// creating table
-	const char sql[] = "CREATE TABLE users("
-			"nickname CHAR(120) PRIMARY KEY     NOT NULL,"
-			"last_login         DATETIME,"
-			"online 			INTEGER );";
 	char *err_msg = NULL;
 
-	int rc = sqlite3_exec(db, sql, NULL, 0, &err_msg);
+	int rc = sqlite3_exec(db, create_db_sql, NULL, 0, &err_msg);
 
 	log_info("Creating database from zero...");
 	if (rc != SQLITE_OK) {
