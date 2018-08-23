@@ -111,6 +111,27 @@ size_t userman_get_users(char, char**);
 bool userman_set_user_status(char*, bool);
 
 /**
+ * Checks if user is online or not.
+ *
+ * @param nickname user to check the status
+ * @return true if online, false if not
+ */
+bool userman_user_is_online(char *nickname);
+
+/**
+ * Add message to database.
+ *
+ * @param sender sender of message
+ * @param receiver recipient of message
+ * @param read true if message is read, false if it's not read
+ * @param body the body of message
+ * @param is_file true if file is sent, false if it's not sent.
+ * @return true on success, false on failure.
+ */
+bool userman_add_message(char *sender, char *receiver, bool read, char *body,
+bool is_file);
+
+/**
  * Deallocate and destroy userman.
  */
 void userman_destroy();

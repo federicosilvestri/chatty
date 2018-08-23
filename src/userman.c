@@ -36,9 +36,17 @@
 #define __USERLIST_SIZE(X) ((size_t)((MAX_NAME_LENGTH + 1) * ((int) sizeof(char)) * (X)))
 
 static const char create_db_sql[] = "CREATE TABLE users("
-		"nickname CHAR(120) PRIMARY KEY     NOT NULL,"
+		"nickname 			CHAR(%d) PRIMARY KEY     NOT NULL,"
 		"last_login         DATETIME,"
-		"online 			INTEGER );";
+		"online 			INTEGER );\n"
+		"CREATE TABLE messages("
+		"ID					INTEGER PRIMARY KEY AUTOINCREMENT,"
+		"sender				CHAR(%d) NOT NULL,"
+		"receiver			CHAR(%d) NOT NULL,"
+		"timestamp			DATETIME,"
+		"body				TEXT,"
+		"is_file			INTEGER,"
+		"read				INTEGER);";
 
 static const char user_insert_query[] =
 		"INSERT INTO users (nickname, last_login, online) "
@@ -60,6 +68,13 @@ static const char user_get_offline_query[] = " WHERE online = '0'";
 static const char user_set_status_query[] =
 		"UPDATE users SET online = '%d' WHERE nickname = '%s'";
 
+static const char user_is_online_query[] = "SELECT EXISTS(SELECT 1 FROM users"
+		" WHERE nickname = '%s' AND online='1')";
+
+static const char message_add_query[] =
+		"INSERT INTO messages(sender, receiver, timestamp, body, is_file, read) "
+				"VALUES ('%s', '%s', time('now'), '%s', '%d', '%d') ";
+
 /**
  * External configuration struct from config
  */
@@ -75,19 +90,80 @@ static const char *db_pathname;
  */
 static sqlite3 *db;
 
+/**
+ * This function is a very simple sanitizer to avoid SQL Injection.
+ * It replaces the escape chars, e.g. ' with '' or " with "".
+ *
+ * @param value to sanitize
+ * @return number of occurences if success, -1 if error.
+ */
+static int simple_value_sanitizer(char **str) {
+	if (*str == NULL) {
+		return -1;
+	}
+
+	unsigned int rep = 0;
+	for (unsigned int i = 0; i < strlen(*str) + 1; i++) {
+		if (i == 0) {
+			if ((*str)[i] == '\'') {
+				rep += 1;
+			}
+		} else {
+			if ((*str)[i - 1] != '\'' && (*str)[i] == '\'') {
+				rep += 1;
+			}
+		}
+	}
+
+	// create another string with
+	char *str_san = calloc(sizeof(char), sizeof(char) * (strlen(*str) + rep + 2));
+
+	for (unsigned int i = 0, j = 0; i < strlen(*str); i++, j++) {
+		if (i == 0) {
+			if ((*str)[i] == '\'') {
+				str_san[j] = '\'';
+				str_san[j+1] = (*str)[i];
+				j += 1;
+			} else {
+				str_san[j] = (*str)[i];
+			}
+		} else {
+			if ((*str)[i-1] != '\'' && ((*str)[i] == '\'')) {
+				str_san[j] = '\'';
+				str_san[j+1] = (*str)[i];
+				j += 1;
+			} else {
+				str_san[j] = (*str)[i];
+			}
+		}
+	}
+
+	// free pointer
+	free(*str);
+	*str = str_san;
+	return (int) rep;
+}
+
 static bool userman_create_db() {
 	// creating table
 	char *err_msg = NULL;
 
-	int rc = sqlite3_exec(db, create_db_sql, NULL, 0, &err_msg);
+	char *sql = calloc(sizeof(char),
+			sizeof(create_db_sql) + sizeof(char) * 9 * 3);
+	sprintf(sql, create_db_sql, MAX_NAME_LENGTH, MAX_NAME_LENGTH,
+	MAX_NAME_LENGTH);
+
+	int rc = sqlite3_exec(db, sql, NULL, 0, &err_msg);
 
 	log_info("Creating database from zero...");
 	if (rc != SQLITE_OK) {
 		log_fatal("Cannot create table on database: %s", err_msg);
 		sqlite3_free(err_msg);
+		free(sql);
 		return false;
 	}
 
+	free(sql);
 	return true;
 }
 
@@ -210,8 +286,8 @@ bool userman_user_exists(char *nickname) {
 int userman_add_user(char *nickname) {
 	// check first if exists
 	if (nickname == NULL) {
-			return 2;
-		}
+		return 2;
+	}
 
 	if (userman_user_exists(nickname) == true) {
 		return 1;
@@ -391,9 +467,93 @@ bool userman_set_user_status(char *nickname, bool status) {
 	return ret;
 }
 
+bool userman_user_is_online(char *nickname) {
+	// query composition
+	char *sql_query = calloc(sizeof(char),
+			sizeof(user_is_online_query) + strlen(nickname) + 3);
+	sprintf(sql_query, user_is_online_query, nickname);
+
+	sqlite3_stmt *stmt = NULL;
+	int rc = sqlite3_prepare_v2(db, sql_query, -1, &stmt, NULL);
+	if (rc != SQLITE_OK) {
+		log_fatal("Cannot prepare v2 statement!, %s", sqlite3_errmsg(db));
+		return false; // return a sane value
+	}
+
+	rc = sqlite3_step(stmt);
+	int ret_value = 1;
+
+	while (rc != SQLITE_DONE && rc != SQLITE_OK) {
+		int colCount = sqlite3_column_count(stmt);
+		for (int colIndex = 0; colIndex < colCount; colIndex++) {
+			int type = sqlite3_column_type(stmt, colIndex);
+
+			if (type == SQLITE_INTEGER) {
+				ret_value = sqlite3_column_int(stmt, colIndex);
+			} else {
+				log_fatal("Unexpected response from query!");
+				exit(1);
+			}
+		}
+
+		rc = sqlite3_step(stmt);
+	}
+	rc = sqlite3_finalize(stmt);
+
+	// cleanup
+	free(sql_query);
+
+	return (ret_value == 1);
+}
+
+bool userman_add_message(char *sender, char *receiver, bool read, char *body,
+bool is_file) {
+	// sanitize string values
+	// copy body_c to similiar array to avoid memory inconvenient
+	char *body_san = calloc(sizeof(char), strlen(body) + 1);
+	strcpy(body_san, body);
+
+	simple_value_sanitizer(&body_san);
+
+	// query composition
+	size_t query_size = sizeof(message_add_query); // standard query template
+	query_size += sizeof(char) * (strlen(sender) + 1); // sender
+	query_size += sizeof(char) * (strlen(receiver) + 1); // receiver
+	query_size += sizeof(char) * 1; // bool value
+	query_size += sizeof(char) * (strlen(body) + 1); // body size
+	query_size += sizeof(char) * 1; // bool value
+
+	// building query
+	char *sql = calloc(sizeof(char), query_size);
+	if (sql == NULL) {
+		log_fatal("Out of memory during insert message query building...");
+		return false;
+	}
+	sprintf(sql, message_add_query, sender, receiver, body_san, is_file, read);
+
+	log_trace("Insert msg query: %s", sql);
+
+	// query execution
+	char *err_msg = NULL;
+	int rc = sqlite3_exec(db, sql, NULL, 0, &err_msg);
+
+	if (rc != SQLITE_OK) {
+		log_fatal("SQL error: %s", err_msg);
+		// cleanup
+		sqlite3_free(err_msg);
+		free(sql);
+		free(body_san);
+		return false;
+	}
+
+	// cleanup
+	free(sql);
+	free(body_san);
+	return true;
+}
+
 void userman_destroy() {
 	if (sqlite3_close(db) != SQLITE_OK) {
 		log_warn("Cannot close database: %s", sqlite3_errmsg(db));
 	}
-
 }

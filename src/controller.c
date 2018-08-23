@@ -27,6 +27,7 @@
 #include "producer.h"
 #include "consumer.h"
 #include "userman.h"
+#include "worker.h"
 
 /**
  * This is the internal status variable.
@@ -48,6 +49,10 @@ bool server_init() {
 	}
 
 	if (userman_init() == false) {
+		return false;
+	}
+
+	if (worker_init() == false) {
 		return false;
 	}
 

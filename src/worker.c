@@ -17,17 +17,102 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
+#include <libconfig.h>
 
 #include "connections.h"
 #include "message.h"
 #include "ops.h"
 
 #include "log.h"
+#include "config.h"
 #include "controller.h"
 #include "producer.h"
 #include "userman.h"
 
+/**
+ * Variable to register initialization status.
+ */
+static bool init = false;
+
+/**
+ * External configuration by configuration header.
+ */
+extern config_t server_conf;
+
+/**
+ * External sockets array.
+ */
 extern int *sockets;
+
+/**
+ * Internal max_message_size configuration parameter.
+ */
+static int max_message_size;
+
+/**
+ * Internal max_file_size configuration parameter.
+ */
+static int max_file_size;
+
+/**
+ * Internal max_hist_msgs configuration parameter.
+ */
+static int max_hist_msgs;
+
+/**
+ * Internal file_dir_name configuration parameter.
+ */
+static const char* file_dir_name;
+
+bool worker_init() {
+	if (init == true) {
+		log_error("Worker is already initialized!");
+		return false;
+	}
+
+	if (config_lookup_int(&server_conf, "MaxMsgSize",
+			&max_message_size) == CONFIG_FALSE) {
+		log_fatal("Cannot get value for MaxMsgSize!");
+		return false;
+	}
+
+	if (max_message_size <= 0) {
+		log_fatal("MaxMsgSize cannot be <= 0");
+		return false;
+	}
+
+	if (config_lookup_int(&server_conf, "MaxFileSize",
+			&max_file_size) == CONFIG_FALSE) {
+		log_fatal("Cannot get value for MaxFileSize!");
+		return false;
+	}
+
+	if (max_file_size <= 0) {
+		log_fatal("MaxFileSize cannot be <= 0");
+		return false;
+	}
+
+	if (config_lookup_int(&server_conf, "MaxHistMsgs",
+			&max_hist_msgs) == CONFIG_FALSE) {
+		log_fatal("Cannot get value for MaxHistMsgs!");
+		return false;
+	}
+
+	if (max_hist_msgs < 0) {
+		log_fatal("MaxHistsMsg cannot be < 0!");
+		return false;
+	}
+
+	if (config_lookup_string(&server_conf, "DirName",
+			&file_dir_name) == CONFIG_FALSE) {
+		log_fatal("Cannot get value for DirName!");
+		return false;
+	}
+
+	init = true;
+
+	return true;
+}
 
 static void prepare_header(message_hdr_t *hdr) {
 	memset(hdr, 0, sizeof(message_hdr_t));
@@ -183,10 +268,65 @@ static inline void worker_connect_user(int index, message_t *msg) {
 }
 
 static void worker_posttxt(int index, message_t *msg) {
-	// send ack
-	index=msg->hdr.op;
-	index++;
+	// prepare the reply
+	message_hdr_t reply_hdr;
+	prepare_header(&reply_hdr);
 
+	log_debug("Message sender: %s Message Receiver: %s , Message body: %s",
+			msg->hdr.sender, msg->data.hdr.receiver, msg->data.buf);
+
+	/*
+	 * sending message. first check if receiver user exists.
+	 * later check if is online, if is not online, store message as unread.
+	 */
+	bool stop = false;
+	if (strlen(msg->data.hdr.receiver) <= 0) {
+		// invalid receiver
+		log_warn("User cannot send message to invalid user!");
+		reply_hdr.op = OP_NICK_UNKNOWN;
+		stop = true;
+	} else if (msg->data.buf == NULL) {
+		// invalid buffer
+		log_warn("User has sent NULL message (buffer = NULL)");
+		reply_hdr.op = OP_FAIL;
+	} else if (strlen(msg->data.buf) > (unsigned int) max_message_size) {
+		log_warn("User has sent a too long message!");
+		reply_hdr.op = OP_MSG_TOOLONG;
+	} else {
+		// message should be OK, no SQL Injection test?...
+		bool exists = userman_user_exists(msg->data.hdr.receiver);
+
+		if (exists == false) {
+			log_warn("User has sent a message to unknown user...");
+			reply_hdr.op = OP_NICK_UNKNOWN;
+			stop = true;
+		}
+	}
+
+	// @todo if sender = receiver ?????? check it.
+
+	if (stop) {
+		// an error is occurred, send header and stop.
+		int wh_size = sendHeader(sockets[index], &reply_hdr);
+
+		if (wh_size <= 0) {
+			log_error("Cannot send reply header to user! error:%s",
+					strerror(errno));
+		}
+
+		return;
+	}
+
+	// check if user is online
+	if (userman_user_is_online(msg->data.hdr.receiver) == true) {
+		// send message directly
+		log_trace("USER IS ONLINE");
+		userman_add_message(msg->hdr.sender, msg->data.hdr.receiver, true, msg->data.buf, false);
+	} else {
+		// send to DB.
+		log_trace("USER IS NNNOOOOTTTT ONLINE");
+		userman_add_message(msg->hdr.sender, msg->data.hdr.receiver, false, msg->data.buf, false);
+	}
 }
 
 static int worker_action_router(int index, message_t *msg) {
@@ -243,6 +383,15 @@ static int worker_action_router(int index, message_t *msg) {
 }
 
 void worker_run(amqp_message_t message) {
+	// check initialization
+	if (init == false) {
+		log_fatal("Worker is not initialized yet.");
+		/*
+		 * We can implement a very simple wait_cond, if needed.
+		 */
+		return;
+	}
+
 	// access data pointed by body message, i.e. fd
 	int *udata = (int*) message.body.bytes;
 	int index = udata[0];
