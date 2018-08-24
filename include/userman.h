@@ -132,6 +132,15 @@ bool userman_add_message(char *sender, char *receiver, bool read, char *body,
 bool is_file);
 
 /**
+ * Get the previous messages of users.
+ *
+ * @param nickname that identifies the user
+ * @param the pointer to the message list
+ * @return -1 in case of error, the number of messages in case of success
+ */
+int userman_get_prev_msgs(char *, char***);
+
+/**
  * Deallocate and destroy userman.
  */
 void userman_destroy();

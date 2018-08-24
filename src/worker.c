@@ -267,6 +267,45 @@ static inline void worker_connect_user(int index, message_t *msg) {
 	}
 }
 
+static bool worker_send_live_msg_user(message_t *msg) {
+	/*
+	 * This function is synchronous respect to message sending.
+	 */
+
+	// try to search the resident socket
+	int rec_index = producer_get_fd_by_nickname(msg->data.hdr.receiver);
+
+	log_trace("SOCKET INDEX IS %d", rec_index);
+	if (rec_index < 0) {
+		// user isn't connected.
+		return false;
+	}
+
+	// lock the socket POSSIBLE ERROR DURING LOCKING
+	//producer_lock_socket(rec_index);
+	message_t reply;
+	prepare_header(&reply.hdr);
+	prepare_data(&reply.data, msg->data.hdr.receiver);
+
+	reply.hdr.op = TXT_MESSAGE;
+	strcpy(reply.hdr.sender,msg->hdr.sender);
+	strcpy(reply.data.hdr.receiver, msg->data.hdr.receiver);
+	reply.data.hdr.len = msg->data.hdr.len;
+	reply.data.buf = msg->data.buf;
+
+	// send message
+	if (sendRequest(sockets[rec_index], &reply) <= 0) {
+		log_warn("Cannot send message to user...");
+		//producer_unlock_socket(rec_index);
+		return false;
+	}
+
+	log_warn("Message sent to user!");
+	//producer_unlock_socket(rec_index);
+
+	return true;
+}
+
 static void worker_posttxt(int index, message_t *msg) {
 	// prepare the reply
 	message_hdr_t reply_hdr;
@@ -303,30 +342,42 @@ static void worker_posttxt(int index, message_t *msg) {
 		}
 	}
 
-	// @todo if sender = receiver ?????? check it.
+	if (!stop) {
+		// if sender == receiver, send in background
+		if (strcmp(msg->hdr.sender,msg->data.hdr.receiver) == 0) {
+			userman_add_message(msg->hdr.sender, msg->data.hdr.receiver,
+			false, msg->data.buf, false);
+			reply_hdr.op = OP_OK;
 
-	if (stop) {
-		// an error is occurred, send header and stop.
-		int wh_size = sendHeader(sockets[index], &reply_hdr);
+			// check if user is online
+		} else if (userman_user_is_online(msg->data.hdr.receiver) == true) {
+			// send message directly
+			log_trace("SENDING LIVE MESSAGE");
+			bool delivery = worker_send_live_msg_user(msg);
 
-		if (wh_size <= 0) {
-			log_error("Cannot send reply header to user! error:%s",
-					strerror(errno));
+			userman_add_message(msg->hdr.sender, msg->data.hdr.receiver,
+					delivery, msg->data.buf, false);
+
+			reply_hdr.op = OP_OK;
+		} else {
+			// send to DB.
+			userman_add_message(msg->hdr.sender, msg->data.hdr.receiver, false,
+					msg->data.buf, false);
+			reply_hdr.op = OP_OK;
 		}
-
-		return;
 	}
 
-	// check if user is online
-	if (userman_user_is_online(msg->data.hdr.receiver) == true) {
-		// send message directly
-		log_trace("USER IS ONLINE");
-		userman_add_message(msg->hdr.sender, msg->data.hdr.receiver, true, msg->data.buf, false);
-	} else {
-		// send to DB.
-		log_trace("USER IS NNNOOOOTTTT ONLINE");
-		userman_add_message(msg->hdr.sender, msg->data.hdr.receiver, false, msg->data.buf, false);
+	// an error is occurred, send header and stop.
+	int wh_size = sendHeader(sockets[index], &reply_hdr);
+
+	if (wh_size <= 0) {
+		log_error("Cannot send reply header to user! error:%s",
+				strerror(errno));
 	}
+}
+
+static void worker_get_prev_msgs(int index, message_t *msg) {
+
 }
 
 static int worker_action_router(int index, message_t *msg) {
@@ -350,9 +401,12 @@ static int worker_action_router(int index, message_t *msg) {
 	case POSTTXTALL_OP:
 	case POSTFILE_OP:
 	case GETFILE_OP:
-	case GETPREVMSGS_OP:
 		log_fatal("NOT IMPLEMENTED ACTIONS");
 		ret = -1;
+		break;
+	case GETPREVMSGS_OP:
+		worker_get_prev_msgs(index, msg);
+		ret = 0;
 		break;
 	case USRLIST_OP:
 		worker_user_list(index, msg, true, USERMAN_GET_ONL);

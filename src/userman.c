@@ -75,6 +75,9 @@ static const char message_add_query[] =
 		"INSERT INTO messages(sender, receiver, timestamp, body, is_file, read) "
 				"VALUES ('%s', '%s', time('now'), '%s', '%d', '%d') ";
 
+static const char message_history_get[] = "SELECT body FROM messages "
+		"WHERE receiver = '%s' AND is_file = '0'";
+
 /**
  * External configuration struct from config
  */
@@ -116,21 +119,22 @@ static int simple_value_sanitizer(char **str) {
 	}
 
 	// create another string with
-	char *str_san = calloc(sizeof(char), sizeof(char) * (strlen(*str) + rep + 2));
+	char *str_san = calloc(sizeof(char),
+			sizeof(char) * (strlen(*str) + rep + 2));
 
 	for (unsigned int i = 0, j = 0; i < strlen(*str); i++, j++) {
 		if (i == 0) {
 			if ((*str)[i] == '\'') {
 				str_san[j] = '\'';
-				str_san[j+1] = (*str)[i];
+				str_san[j + 1] = (*str)[i];
 				j += 1;
 			} else {
 				str_san[j] = (*str)[i];
 			}
 		} else {
-			if ((*str)[i-1] != '\'' && ((*str)[i] == '\'')) {
+			if ((*str)[i - 1] != '\'' && ((*str)[i] == '\'')) {
 				str_san[j] = '\'';
-				str_san[j+1] = (*str)[i];
+				str_san[j + 1] = (*str)[i];
 				j += 1;
 			} else {
 				str_san[j] = (*str)[i];
@@ -550,6 +554,68 @@ bool is_file) {
 	free(sql);
 	free(body_san);
 	return true;
+}
+
+int userman_get_prev_msgs(char *nickname, char ***list) {
+	// query building
+	char *sql = NULL;
+	size_t sql_size = sizeof(message_history_get);
+	sql_size += sizeof(char) * (strlen(nickname) + 1);
+
+	sql = calloc(sizeof(char), sql_size);
+
+	if (sql == NULL) {
+		log_fatal("Out of memory");
+		return -1;
+	}
+
+	sprintf(sql, message_history_get, nickname);
+
+	sqlite3_stmt *stmt = NULL;
+	int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+	if (rc != SQLITE_OK) {
+		log_fatal("Cannot prepare v2_statement %s", sqlite3_errmsg(db));
+		return 0;
+	}
+
+	// return value
+	int row_count = 0;
+	rc = sqlite3_step(stmt);
+	*list = malloc(sizeof(char**));
+
+	while (rc != SQLITE_DONE && rc != SQLITE_OK) {
+		row_count++;
+		int colCount = sqlite3_column_count(stmt);
+
+		for (int colIndex = 0; colIndex < colCount; colIndex++) {
+			int type = sqlite3_column_type(stmt, colIndex);
+
+			if (type == SQLITE_TEXT) {
+				const char *body = (char*) sqlite3_column_text(stmt,
+						colIndex);
+				*list[row_count] = malloc(sizeof(char) * (strlen(body) + 1));
+				strcpy(*list[row_count], body);
+			} else {
+				log_fatal(
+						"Unexpected return value from sqlite during user selection");
+				return 0;
+			}
+		}
+
+		rc = sqlite3_step(stmt);
+
+		// check if need to realloc
+		if (rc != SQLITE_DONE) {
+			*list = realloc(*list, sizeof(char**) * (size_t)(row_count + 1));
+		}
+	}
+
+	// it frees the pointers
+	rc = sqlite3_finalize(stmt);
+	free(sql);
+
+	return row_count;
+
 }
 
 void userman_destroy() {

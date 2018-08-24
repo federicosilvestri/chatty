@@ -70,13 +70,7 @@ static amqp_socket_t *p_socket = NULL;
 static amqp_connection_state_t p_conn;
 extern const char *rabmq_exchange;
 
-/**
- * Internal function to lock the
- * socket file descriptor.
- *
- * @param index index of sockets array
- */
-static void producer_lock_socket(int index) {
+void producer_lock_socket(int index) {
 	pthread_mutex_lock(&socket_mutex);
 	if (sockets_block[index] == true) {
 		log_fatal("Socket is already locked.");
@@ -134,6 +128,23 @@ void producer_get_fd_nickname(int index, char **nickname) {
 		strcpy(*nickname, sockets_cu_nick[index]);
 	}
 	pthread_mutex_unlock(&socket_mutex);
+}
+
+int producer_get_fd_by_nickname(char* nickname) {
+	if (nickname == NULL) {
+		return -1;
+	}
+
+	pthread_mutex_lock(&socket_mutex);
+	int index = -1;
+	for (int i = 0; i < max_connections && index == -1; i++) {
+		if (strcmp(nickname, sockets_cu_nick[i]) == 0) {
+			index = i;
+		}
+	}
+	pthread_mutex_unlock(&socket_mutex);
+
+	return index;
 }
 
 /**

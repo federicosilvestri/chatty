@@ -49,6 +49,15 @@ void producer_destroy();
 void producer_disconnect_host(int);
 
 /**
+ * This function locks (block) the selected
+ * socket to producer, and it must be used
+ * when you want to use the socket.
+ * @brief lock socket to producer
+ * @param int socket index
+ */
+void producer_lock_socket(int);
+
+/**
  * This function unlocks (releases) the selected
  * socket to producer, and it must be used
  * when a worker ends the execution.
@@ -75,5 +84,12 @@ void producer_set_fd_nickname(int, char*);
  * @param pointer to string
  */
 void producer_get_fd_nickname(int, char**);
+
+/**
+ * This function retrieve the socket where user with nickname is connected.
+ * @param nickname to search
+ * @return -1 in case of fail, else the fd
+ */
+int producer_get_fd_by_nickname(char*);
 
 #endif /* PRODUCER_H */
