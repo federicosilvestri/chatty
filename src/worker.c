@@ -29,6 +29,9 @@
 #include "producer.h"
 #include "userman.h"
 
+// ONLY DEBUG
+extern bool *sockets_block;
+
 /**
  * Variable to register initialization status.
  */
@@ -288,7 +291,7 @@ static bool worker_send_live_msg_user(message_t *msg) {
 	prepare_data(&reply.data, msg->data.hdr.receiver);
 
 	reply.hdr.op = TXT_MESSAGE;
-	strcpy(reply.hdr.sender,msg->hdr.sender);
+	strcpy(reply.hdr.sender, msg->hdr.sender);
 	strcpy(reply.data.hdr.receiver, msg->data.hdr.receiver);
 	reply.data.hdr.len = msg->data.hdr.len;
 	reply.data.buf = msg->data.buf;
@@ -344,7 +347,7 @@ static void worker_posttxt(int index, message_t *msg) {
 
 	if (!stop) {
 		// if sender == receiver, send in background
-		if (strcmp(msg->hdr.sender,msg->data.hdr.receiver) == 0) {
+		if (strcmp(msg->hdr.sender, msg->data.hdr.receiver) == 0) {
 			userman_add_message(msg->hdr.sender, msg->data.hdr.receiver,
 			false, msg->data.buf, false);
 			reply_hdr.op = OP_OK;
@@ -387,7 +390,8 @@ static void worker_get_prev_msgs(int index, message_t *msg) {
 	int prev_msgs_n = userman_get_prev_msgs(msg->hdr.sender, &list, &file_list);
 
 	if (prev_msgs_n < 0) {
-		log_fatal("Cannot continue to send previous messages due to previous error.");
+		log_fatal(
+				"Cannot continue to send previous messages due to previous error.");
 		ack_reply.op = OP_FAIL;
 	} else {
 		ack_reply.op = OP_OK;
@@ -419,7 +423,8 @@ static void worker_get_prev_msgs(int index, message_t *msg) {
 	// now send the payloads
 	for (int i = 0; i < prev_msgs_n; i++) {
 		// prepare the message
-		reply.data.hdr.len = (unsigned int) (strlen(list[i]) + 1 * sizeof(char));
+		reply.data.hdr.len =
+				(unsigned int) (strlen(list[i]) + 1 * sizeof(char));
 		reply.data.buf = list[i];
 		reply.hdr.op = file_list[i] == true ? FILE_MESSAGE : TXT_MESSAGE;
 
@@ -514,6 +519,11 @@ void worker_run(amqp_message_t message) {
 	int *udata = (int*) message.body.bytes;
 	int index = udata[0];
 
+	// DEBUG CHECKING
+	if (sockets_block[index] == false) {
+		log_fatal("SOCKET IS NOT BLOCKED DURING WORKER RUNNING!");
+	}
+
 	message_t msg;
 	int read_size;
 
@@ -536,7 +546,8 @@ void worker_run(amqp_message_t message) {
 		 */
 		// try to recover from session
 		char *nickname = NULL;
-		log_debug("Try to retrieve nickname from session with socketfd=%d", sockets[index]);
+		log_debug("Try to retrieve nickname from session with socket index=%d",
+				index);
 		producer_get_fd_nickname(index, &nickname);
 		if (nickname == NULL) {
 			// cache does not contains user nickname, disconnect brutally
