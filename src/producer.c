@@ -380,11 +380,18 @@ static inline void run_manage_conn() {
 			// block the socket
 			producer_lock_socket(i);
 
-			// prepare the id
-			int udata[1] = { i };
+			// prepare the string
+			char amqp_message[10];
+			sprintf(amqp_message, "%d", i);
 			amqp_bytes_t message_bytes;
-			message_bytes.len = sizeof(int);
-			message_bytes.bytes = udata;
+			message_bytes.len = sizeof(amqp_message);
+			message_bytes.bytes = amqp_message;
+
+			// prepare the id
+//			int udata[1] = { i };
+//			amqp_bytes_t message_bytes;
+//			message_bytes.len = sizeof(int);
+//			message_bytes.bytes = udata;
 
 			// put into queue
 			log_trace("Publishing to queue...");

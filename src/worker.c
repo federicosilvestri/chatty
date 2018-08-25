@@ -516,8 +516,10 @@ void worker_run(amqp_message_t message) {
 	}
 
 	// access data pointed by body message, i.e. fd
-	int *udata = (int*) message.body.bytes;
-	int index = udata[0];
+	char *str_index = message.body.bytes;
+	int index = atoi(str_index);
+//	int *udata = (int*) message.body.bytes;
+//	int index = udata[0];
 
 	// DEBUG CHECKING
 	if (sockets_block[index] == false) {
