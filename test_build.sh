@@ -43,6 +43,13 @@ make deps
 echo "Making chatty"
 make chatty
 
+for (( i=2; i <= 10; ++i ))
+do
+    echo "Make test1"
+    make test1
+done
+
+
 echo "Making docs"
 cd ..
 doxygen

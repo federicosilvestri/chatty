@@ -105,6 +105,7 @@ clean		:
 cleanall	: clean
 	\rm -f *.o *~ libchatty.a valgrind_out $(STAT_PATH) $(UNIX_PATH)
 	\rm -fr  $(DIR_PATH)
+	\rm -f userman.db
 
 killchatty:
 	killall -9 chatty

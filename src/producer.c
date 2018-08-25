@@ -71,6 +71,8 @@ static amqp_connection_state_t p_conn;
 extern const char *rabmq_exchange;
 
 void producer_lock_socket(int index) {
+	log_trace("SOCKET %d LOCKED", sockets[index]);
+
 	pthread_mutex_lock(&socket_mutex);
 	if (sockets_block[index] == true) {
 		log_fatal("Socket is already locked.");
@@ -82,6 +84,7 @@ void producer_lock_socket(int index) {
 }
 
 void producer_unlock_socket(int index) {
+	log_trace("SOCKET %d UNLOCKED", sockets[index]);
 	pthread_mutex_lock(&socket_mutex);
 	if (sockets_block[index] == false) {
 		log_fatal("Socket is already unlocked.");
@@ -334,7 +337,6 @@ static inline void run_manage_conn() {
 			// pending operation
 			// block the socket
 			producer_lock_socket(i);
-//			log_trace("Sockets %d is NOW BLOCKED", sockets[i]);
 
 			// prepare the id
 			int udata[1] = { i };
@@ -391,6 +393,7 @@ static void *producer_run() {
 	sigset_t s_sigset;
 	sigemptyset(&s_sigset);
 	sigaddset(&s_sigset, SIGINT);
+	sigaddset(&s_sigset, SIGQUIT);
 	sigprocmask(SIG_BLOCK, &s_sigset, NULL);
 
 //	// open channel to rabbit

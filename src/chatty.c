@@ -99,7 +99,7 @@ int main(int argc, char *argv[]) {
 		switch (action) {
 		case SIGINT:
 		case SIGQUIT:
-			log_info("Received SIGQUIT, quitting...");
+			log_info("Received signal that stops server, quitting...");
 			server_stop();
 			break;
 		case SIGUSR1:

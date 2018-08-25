@@ -136,9 +136,10 @@ bool is_file);
  *
  * @param nickname that identifies the user
  * @param the pointer to the message list
+ * @param the pointer to the bool is_file list
  * @return -1 in case of error, the number of messages in case of success
  */
-int userman_get_prev_msgs(char *, char***);
+int userman_get_prev_msgs(char *, char***, bool**);
 
 /**
  * Deallocate and destroy userman.

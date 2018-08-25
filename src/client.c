@@ -242,7 +242,7 @@ static int execute_requestreply(int connfd, operation_t *o) {
 	    return -1; 
 	}	
 	// numero di messaggi che devo ricevere
-	size_t nmsgs = *(size_t*)(msg.data.buf); 
+	size_t nmsgs = *(size_t*)(msg.data.buf);  // c'è la len nell'header, perché usare la sizeof che non sempre funziona?
 	char *FILENAMES[nmsgs]; // NOTA: si suppone che nmsgs non sia molto grande
 	size_t nfiles=0;
 	for(size_t i=0;i<nmsgs;++i) {

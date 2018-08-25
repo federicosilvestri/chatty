@@ -377,7 +377,71 @@ static void worker_posttxt(int index, message_t *msg) {
 }
 
 static void worker_get_prev_msgs(int index, message_t *msg) {
+	// send an ACK (i don't know why)
+	message_hdr_t ack_reply;
+	prepare_header(&ack_reply);
 
+	// try to retrieve messages
+	char **list = NULL;
+	bool *file_list = NULL;
+	int prev_msgs_n = userman_get_prev_msgs(msg->hdr.sender, &list, &file_list);
+
+	if (prev_msgs_n < 0) {
+		log_fatal("Cannot continue to send previous messages due to previous error.");
+		ack_reply.op = OP_FAIL;
+	} else {
+		ack_reply.op = OP_OK;
+	}
+
+	// send ack response
+	if (sendHeader(sockets[index], &ack_reply) < 0) {
+		log_fatal("Cannot send ack to client!");
+		return;
+	}
+
+	if (ack_reply.op == OP_FAIL) {
+		return;
+	}
+
+	// prepare a template of message
+	message_t reply;
+	prepare_data(&reply.data, msg->hdr.sender);
+	prepare_header(&reply.hdr);
+	size_t size_payload = (size_t) prev_msgs_n;
+	reply.data.hdr.len = (unsigned int) prev_msgs_n;
+	reply.data.buf = (char *) &size_payload;
+
+	if (sendData(sockets[index], &reply.data) < 0) {
+		log_fatal("Cannot send message due to previous error!");
+		return;
+	}
+
+	// now send the payloads
+	for (int i = 0; i < prev_msgs_n; i++) {
+		// prepare the message
+		reply.data.hdr.len = (unsigned int) (strlen(list[i]) + 1 * sizeof(char));
+		reply.data.buf = list[i];
+		reply.hdr.op = file_list[i] == true ? FILE_MESSAGE : TXT_MESSAGE;
+
+		// send message
+		if (sendRequest(sockets[index], &reply) < 0) {
+			log_fatal("Cannot send message!");
+		}
+
+		if (file_list[i] == true) {
+			// it's a file!
+			log_fatal("Function not implemented.");
+
+		}
+
+		// free memory
+		free(list[i]);
+
+	}
+
+	// cleanup
+	free(file_list);
+	free(list);
 }
 
 static int worker_action_router(int index, message_t *msg) {
@@ -472,8 +536,8 @@ void worker_run(amqp_message_t message) {
 		 */
 		// try to recover from session
 		char *nickname = NULL;
+		log_debug("Try to retrieve nickname from session with socketfd=%d", sockets[index]);
 		producer_get_fd_nickname(index, &nickname);
-		log_debug("Try to retrieve nickname from session");
 		if (nickname == NULL) {
 			// cache does not contains user nickname, disconnect brutally
 			producer_disconnect_host(index);

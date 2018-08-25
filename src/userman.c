@@ -75,8 +75,8 @@ static const char message_add_query[] =
 		"INSERT INTO messages(sender, receiver, timestamp, body, is_file, read) "
 				"VALUES ('%s', '%s', time('now'), '%s', '%d', '%d') ";
 
-static const char message_history_get[] = "SELECT body FROM messages "
-		"WHERE receiver = '%s' AND is_file = '0'";
+static const char message_history_get[] = "SELECT body, is_file FROM messages "
+		"WHERE receiver = '%s'";
 
 /**
  * External configuration struct from config
@@ -556,7 +556,7 @@ bool is_file) {
 	return true;
 }
 
-int userman_get_prev_msgs(char *nickname, char ***list) {
+int userman_get_prev_msgs(char *nickname, char ***list, bool **is_files) {
 	// query building
 	char *sql = NULL;
 	size_t sql_size = sizeof(message_history_get);
@@ -575,16 +575,16 @@ int userman_get_prev_msgs(char *nickname, char ***list) {
 	int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
 	if (rc != SQLITE_OK) {
 		log_fatal("Cannot prepare v2_statement %s", sqlite3_errmsg(db));
-		return 0;
+		return -1;
 	}
 
 	// return value
 	int row_count = 0;
 	rc = sqlite3_step(stmt);
-	*list = malloc(sizeof(char**));
+	*list = calloc(sizeof(char**), sizeof(char**));
+	*is_files = calloc(sizeof(bool), sizeof(bool));
 
 	while (rc != SQLITE_DONE && rc != SQLITE_OK) {
-		row_count++;
 		int colCount = sqlite3_column_count(stmt);
 
 		for (int colIndex = 0; colIndex < colCount; colIndex++) {
@@ -593,20 +593,30 @@ int userman_get_prev_msgs(char *nickname, char ***list) {
 			if (type == SQLITE_TEXT) {
 				const char *body = (char*) sqlite3_column_text(stmt,
 						colIndex);
-				*list[row_count] = malloc(sizeof(char) * (strlen(body) + 1));
-				strcpy(*list[row_count], body);
+				if (body == NULL) {
+					log_fatal("Cannot retrieve field from SQLITE.");
+					return -1;
+				}
+
+				(*list)[row_count] = malloc(sizeof(char) * (strlen(body) + 1));
+				strcpy((*list)[row_count], body);
+			} else if (type == SQLITE_INTEGER) {
+				bool is_file = (bool) sqlite3_column_int(stmt, colIndex);
+				(*is_files)[row_count] = is_file;
 			} else {
 				log_fatal(
 						"Unexpected return value from sqlite during user selection");
-				return 0;
+				return -1;
 			}
 		}
 
 		rc = sqlite3_step(stmt);
+		row_count++;
 
 		// check if need to realloc
 		if (rc != SQLITE_DONE) {
 			*list = realloc(*list, sizeof(char**) * (size_t)(row_count + 1));
+			*is_files = realloc(*is_files, sizeof(bool*) * (size_t)(row_count + 1));
 		}
 	}
 
