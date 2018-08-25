@@ -103,7 +103,7 @@ void producer_lock_socket(int index) {
 	pthread_mutex_lock(&socket_mutex);
 	if (sockets_block[index] == true) {
 		log_fatal("Socket is already locked.");
-		exit(1);
+		//exit(1);
 	}
 
 	sockets_block[index] = true;
