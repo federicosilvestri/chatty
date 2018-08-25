@@ -41,7 +41,20 @@ static struct sockaddr_un listen_socket;
 static int listen_socket_fd;
 static const struct timespec select_intv = { 0, 500 };
 
+/**
+ * Internal producer threads
+ */
 static pthread_t producer_thread;
+
+/**
+ * System status
+ */
+static int status = SERVER_STATUS_STOPPED;
+
+/**
+ * Mutex for system status
+ */
+static pthread_mutex_t status_mutex;
 
 /**
  * Array (dynamically allocated) that contains
@@ -70,8 +83,24 @@ static amqp_socket_t *p_socket = NULL;
 static amqp_connection_state_t p_conn;
 extern const char *rabmq_exchange;
 
+static int producer_get_status() {
+	int ret;
+
+	pthread_mutex_lock(&status_mutex);
+	ret = status;
+	pthread_mutex_unlock(&status_mutex);
+
+	return ret;
+}
+
+static void producer_set_status(int new_status) {
+	pthread_mutex_lock(&status_mutex);
+	status = new_status;
+	pthread_mutex_unlock(&status_mutex);
+}
+
 void producer_lock_socket(int index) {
-	log_trace("SOCKET %d LOCKED", sockets[index]);
+	log_trace("SOCKET index %d LOCKED", index);
 
 	pthread_mutex_lock(&socket_mutex);
 	if (sockets_block[index] == true) {
@@ -84,7 +113,7 @@ void producer_lock_socket(int index) {
 }
 
 void producer_unlock_socket(int index) {
-	log_trace("SOCKET %d UNLOCKED", sockets[index]);
+	log_trace("SOCKET index %d UNLOCKED", index);
 	pthread_mutex_lock(&socket_mutex);
 	if (sockets_block[index] == false) {
 		log_fatal("Socket is already unlocked.");
@@ -239,6 +268,16 @@ static bool producer_socket_init() {
  * @return true on success, false on error
  */
 bool producer_init() {
+	static bool initialized = false;
+
+	if (initialized == true) {
+		log_fatal("Producer is already initialized!");
+		return false;
+	}
+
+	// initialize mutex
+	pthread_mutex_init(&status_mutex, NULL);
+
 	if (!producer_socket_init()) {
 		return false;
 	}
@@ -246,6 +285,9 @@ bool producer_init() {
 	if (!rabmq_init(&p_socket, &p_conn)) {
 		return false;
 	}
+
+	status = SERVER_STATUS_STOPPED;
+	initialized = true;
 
 	return true;
 }
@@ -389,7 +431,7 @@ static inline void run_cleanup() {
 static void *producer_run() {
 	log_debug("[PRODUCER THREAD] started");
 
-// set blocking signals for select
+// set blocking signals for select to avoid bad connections
 	sigset_t s_sigset;
 	sigemptyset(&s_sigset);
 	sigaddset(&s_sigset, SIGINT);
@@ -404,7 +446,7 @@ static void *producer_run() {
 		pthread_exit(NULL);
 	}
 
-	while (server_status() == SERVER_STATUS_RUNNING) {
+	while (producer_get_status() == SERVER_STATUS_RUNNING) {
 		// initialize sets and get max fds
 		int max_sd = run_init_socket_fds();
 
@@ -445,7 +487,15 @@ static void *producer_run() {
  * @return true on success, false on error
  */
 bool producer_start() {
-// starting thread of producer
+	// get current status
+	if (producer_get_status() != SERVER_STATUS_STOPPED) {
+		log_fatal("Producer is already started!");
+		return false;
+	}
+
+	// starting thread of producer, no concurrency, set the status without locks
+	status = SERVER_STATUS_RUNNING;
+
 	int t_status = pthread_create(&producer_thread, NULL, producer_run,
 	NULL);
 
@@ -459,14 +509,16 @@ bool producer_start() {
 	return true;
 }
 
-void producer_wait() {
-// waiting termination of main thread
+void producer_stop() {
+	producer_set_status(SERVER_STATUS_STOPPED);
+	// waiting termination of main thread
 	pthread_join(producer_thread, NULL);
 }
 
 void producer_destroy() {
 // wait until man thread is not terminated
 	log_debug("Destroying producer");
+	pthread_mutex_destroy(&status_mutex);
 
 	log_debug("Closing listening socket");
 // closing socket connection

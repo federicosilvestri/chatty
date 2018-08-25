@@ -86,7 +86,7 @@ bool server_start() {
 	if (producer_start() == false) {
 		producer_destroy();
 		server_stop();
-		consumer_wait();
+		consumer_stop();
 		consumer_destroy();
 		userman_destroy();
 		return false;
@@ -103,8 +103,15 @@ bool server_stop() {
 		return false;
 	}
 
+	// stopping producer
+	producer_stop();
+
+	// stopping consumer
+	consumer_stop();
+
 	// update status
 	status = SERVER_STATUS_STOPPED;
+
 
 	log_trace("server_stop executed.");
 
@@ -113,12 +120,6 @@ bool server_stop() {
 
 int server_status() {
 	return status;
-}
-
-void server_wait() {
-	// wait termination of consumer thread
-	producer_wait();
-	consumer_wait();
 }
 
 void server_destroy() {

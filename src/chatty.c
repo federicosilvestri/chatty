@@ -113,8 +113,6 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	log_debug("Waiting termination of server...");
-	server_wait();
 	log_debug("Cleaning up...");
 	server_destroy();
 	clean_workspace();

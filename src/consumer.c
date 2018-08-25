@@ -30,13 +30,65 @@
 #include "controller.h"
 #include "worker.h"
 
+/**
+ * External configuration struct by libconfig.
+ */
 extern config_t server_conf;
 
+/**
+ * System status
+ */
+static int status = SERVER_STATUS_STOPPED;
+
+/**
+ * Mutex for system status
+ */
+static pthread_mutex_t status_mutex;
+
+/**
+ * Array of consumer threads
+ */
 static pthread_t *consumer_threads;
+
+/**
+ * Variable to config how many consumer threads must be started.
+ */
 static int consumer_threads_n;
+
+/**
+ * Array that contains consumer thread ids.
+ */
 static int *consumer_threads_ids;
 
+static int consumer_get_status() {
+	int ret;
+
+	pthread_mutex_lock(&status_mutex);
+	ret = status;
+	pthread_mutex_unlock(&status_mutex);
+
+	return ret;
+}
+
+static void consumer_set_status(int new_status) {
+	pthread_mutex_lock(&status_mutex);
+	status = new_status;
+	pthread_mutex_unlock(&status_mutex);
+}
+
 bool consumer_init() {
+	bool initialized = false;
+
+	if (initialized == true) {
+		log_fatal("Consumer is already initialized!");
+		return false;
+	}
+
+	pthread_mutex_init(&status_mutex, NULL);
+
+	// set status (for security
+	status = SERVER_STATUS_STOPPED;
+
 	// get configuration
 	if (config_lookup_int(&server_conf, "ThreadsInPool",
 			&consumer_threads_n) == CONFIG_FALSE) {
@@ -60,13 +112,8 @@ bool consumer_init() {
 		consumer_threads_ids[i] = i;
 	}
 
+	initialized = true;
 	return true;
-}
-
-long now_microseconds() {
-	struct timeval currentTime;
-	gettimeofday(&currentTime, NULL);
-	return currentTime.tv_sec * (int) 1e6 + currentTime.tv_usec;
 }
 
 static bool consumer_run_exception(amqp_connection_state_t conn,
@@ -111,9 +158,7 @@ static bool consumer_run_exception(amqp_connection_state_t conn,
 }
 
 static void consumer_run_wait(amqp_connection_state_t conn, int tid) {
-	int received = 0;
-
-	while (server_status() == SERVER_STATUS_RUNNING) {
+	while (consumer_get_status() == SERVER_STATUS_RUNNING) {
 		amqp_rpc_reply_t ret;
 		amqp_envelope_t envelope;
 		struct timeval timeout = { 1, 0 };
@@ -136,8 +181,6 @@ static void consumer_run_wait(amqp_connection_state_t conn, int tid) {
 
 			amqp_destroy_envelope(&envelope);
 		}
-
-		received++;
 	}
 }
 
@@ -186,6 +229,15 @@ static void *consumer_run(void *index_addr) {
 }
 
 bool consumer_start() {
+	// check if server is already started
+	if (consumer_get_status() != SERVER_STATUS_STOPPED) {
+		log_fatal("Consumer is already started!");
+		return false;
+	}
+
+	// no concurrency, set status
+	status = SERVER_STATUS_RUNNING;
+
 	for (int i = 0; i < consumer_threads_n; i++) {
 
 		int p_stat = pthread_create(&consumer_threads[i], NULL, consumer_run,
@@ -200,18 +252,26 @@ bool consumer_start() {
 	return true;
 }
 
-void consumer_wait() {
+void consumer_stop() {
+	// set the stop status
+	consumer_set_status(SERVER_STATUS_STOPPED);
+
 	for (int i = 0; i < consumer_threads_n; i++) {
 		log_debug("Waiting for consumer thread %d", i);
-//		pthread_kill(consumer_threads[i], SIGKILL);
 		pthread_join(consumer_threads[i], NULL);
 		log_debug("Consumer thread %d done", i);
 	}
 }
 
 void consumer_destroy() {
+	if (consumer_get_status() != SERVER_STATUS_STOPPED) {
+		log_fatal("Cannot destroy consumer when it's in running status!");
+		return;
+	}
+
 	log_trace("executing destroying producer...");
 
+	pthread_mutex_destroy(&status_mutex);
 	free(consumer_threads);
 	free(consumer_threads_ids);
 

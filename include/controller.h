@@ -64,11 +64,6 @@ int server_status();
 bool server_stop();
 
 /**
- * This function puts the controller thread in wait status.
- */
-void server_wait();
-
-/**
  * Destroy the server.
  */
 void server_destroy();

@@ -24,9 +24,9 @@ bool consumer_init();
 bool consumer_start();
 
 /**
- * Waits termination of thread pool.
+ * Stop and waits termination of thread pool.
  */
-void consumer_wait();
+void consumer_stop();
 
 /**
  * This function destroys the consumer service.

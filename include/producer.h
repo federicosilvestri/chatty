@@ -27,9 +27,9 @@ bool producer_init();
 bool producer_start();
 
 /**
- * Wait termination of thread.
+ * Stop and wait termination of thread.
  */
-void producer_wait();
+void producer_stop();
 
 /**
  * Destroy the producer
