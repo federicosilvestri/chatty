@@ -299,12 +299,10 @@ static bool worker_send_live_msg_user(message_t *msg) {
 	// send message
 	if (sendRequest(sockets[rec_index], &reply) <= 0) {
 		log_warn("Cannot send message to user...");
-		//producer_unlock_socket(rec_index);
 		return false;
 	}
 
 	log_warn("Message sent to user!");
-	//producer_unlock_socket(rec_index);
 
 	return true;
 }
@@ -516,15 +514,8 @@ void worker_run(amqp_message_t message) {
 	}
 
 	// access data pointed by body message, i.e. fd
-	char *str_index = message.body.bytes;
-	int index = atoi(str_index);
-//	int *udata = (int*) message.body.bytes;
-//	int index = udata[0];
-
-	// DEBUG CHECKING
-	if (sockets_block[index] == false) {
-		log_fatal("SOCKET IS NOT BLOCKED DURING WORKER RUNNING!");
-	}
+	int *udata = (int*) message.body.bytes;
+	int index = udata[0];
 
 	message_t msg;
 	int read_size;

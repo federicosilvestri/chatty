@@ -67,13 +67,13 @@ int *sockets;
  * boolean value to check if socket file descriptor
  * is in use or not.
  */
-bool *sockets_block;
+static bool *sockets_block;
 
 /**
  * Array (partially dynamically allocated) that contains a
  * string value of user that is connected to the current socket.
  */
-char **sockets_cu_nick;
+static char **sockets_cu_nick;
 
 pthread_mutex_t socket_mutex;
 
@@ -100,8 +100,6 @@ static void producer_set_status(int new_status) {
 }
 
 void producer_lock_socket(int index) {
-	log_trace("SOCKET index %d LOCKED", index);
-
 	pthread_mutex_lock(&socket_mutex);
 	if (sockets_block[index] == true) {
 		log_fatal("Socket is already locked.");
@@ -110,10 +108,10 @@ void producer_lock_socket(int index) {
 
 	sockets_block[index] = true;
 	pthread_mutex_unlock(&socket_mutex);
+	log_trace("SOCKET index %d LOCKED", index);
 }
 
 void producer_unlock_socket(int index) {
-	log_trace("SOCKET index %d UNLOCKED", index);
 	pthread_mutex_lock(&socket_mutex);
 	if (sockets_block[index] == false) {
 		log_fatal("Socket is already unlocked.");
@@ -122,6 +120,7 @@ void producer_unlock_socket(int index) {
 
 	sockets_block[index] = false;
 	pthread_mutex_unlock(&socket_mutex);
+	log_trace("SOCKET index %d UNLOCKED", index);
 }
 
 void producer_disconnect_host(int index) {
@@ -369,7 +368,7 @@ static inline bool run_manage_new_conn() {
 
 /**
  * Manage the active connection.
- * If a message is in the queue, it will be sent to RabbitM (the consumer queue).
+ * If a message is in the queue, it will be sent to RabbitMQ (the consumer queue).
  */
 static inline void run_manage_conn() {
 	for (int i = 0; i < max_connections; i++) {
@@ -380,18 +379,11 @@ static inline void run_manage_conn() {
 			// block the socket
 			producer_lock_socket(i);
 
-			// prepare the string
-			char amqp_message[10];
-			sprintf(amqp_message, "%d", i);
-			amqp_bytes_t message_bytes;
-			message_bytes.len = sizeof(amqp_message);
-			message_bytes.bytes = amqp_message;
-
 			// prepare the id
-//			int udata[1] = { i };
-//			amqp_bytes_t message_bytes;
-//			message_bytes.len = sizeof(int);
-//			message_bytes.bytes = udata;
+			int udata[1] = { i };
+			amqp_bytes_t message_bytes;
+			message_bytes.len = sizeof(int);
+			message_bytes.bytes = udata;
 
 			// put into queue
 			log_trace("Publishing to queue...");
