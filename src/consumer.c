@@ -69,17 +69,17 @@ static int *consumer_threads_ids;
 static int consumer_get_status() {
 	int ret;
 
-	pthread_mutex_lock(&status_mutex);
+	check_mutex_lu_call(pthread_mutex_lock(&status_mutex));
 	ret = status;
-	pthread_mutex_unlock(&status_mutex);
+	check_mutex_lu_call(pthread_mutex_unlock(&status_mutex));
 
 	return ret;
 }
 
 static void consumer_set_status(int new_status) {
-	pthread_mutex_lock(&status_mutex);
+	check_mutex_lu_call(pthread_mutex_lock(&status_mutex));
 	status = new_status;
-	pthread_mutex_unlock(&status_mutex);
+	check_mutex_lu_call(pthread_mutex_unlock(&status_mutex));
 }
 
 bool consumer_init() {

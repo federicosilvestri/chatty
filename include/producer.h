@@ -98,9 +98,19 @@ void producer_get_fd_nickname(int index, char** nickname);
 
 /**
  * This function retrieve the socket where user with nickname is connected.
+ *
  * @param nickname to search
  * @return -1 in case of fail, else the fd
  */
 int producer_get_fd_by_nickname(char* nickname);
+
+/**
+ * This function checks how many sockets are opened for a user,
+ * identified by nickname.
+ *
+ * @param nickname the nickname of the user to search
+ * @return -1 in case of general error, 0 if no sockets are opened, the number of the opened sockets.
+ */
+int producer_get_fds_n_by_nickname(char *nickname);
 
 #endif /* PRODUCER_H */

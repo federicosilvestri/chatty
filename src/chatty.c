@@ -45,7 +45,8 @@ struct statistics chattyStats = { 0, 0, 0, 0, 0, 0, 0 };
  */
 static void usage(const char *progname) {
 	fprintf(stderr, "Il server va lanciato con il seguente comando:\n");
-	fprintf(stderr, "  %s -f <configuration-file>\n", progname);
+	fprintf(stderr, "  %s -f <configuration-file> [ -v 1|2|3|4|5|6|7 ]\n", progname);
+	fprintf(stderr, "  -v means verbose, 1 means TRACE, 7 means QUITE(suppress all messages)\n");
 }
 
 /**
@@ -55,11 +56,14 @@ static void usage(const char *progname) {
  * @return program exit code.
  */
 int main(int argc, char *argv[]) {
-	log_init();
+	int log_level = STD_LOG_LEVEL;
 
-	if (check_arguments(argc, argv) == false) {
+	if (checkandget_arguments(argc, argv, &log_level) == false) {
 		return 1;
 	}
+
+	// set the log level
+	log_init(log_level - 1);
 
 	if (config_parse(argv[2]) == false) {
 		return 1;
@@ -128,8 +132,8 @@ int main(int argc, char *argv[]) {
  * @param argv system argument
  * @return true if arguments are valid, false otherwise
  */
-bool check_arguments(int argc, char *argv[]) {
-	if (argc < 3) {
+static bool checkandget_arguments(int argc, char *argv[], int* log_level) {
+	if (argc < 3 || argc == 4) {
 		usage(argv[0]);
 		return false;
 	}
@@ -139,14 +143,28 @@ bool check_arguments(int argc, char *argv[]) {
 		return false;
 	}
 
-	log_debug("Arguments test passed");
+	if (argc == 5) {
+		// log configuration detected
+		if (strcmp(argv[3], "-v") != 0) {
+			usage(argv[0]);
+			return false;
+		}
+
+		// get the log level
+		*log_level = atoi(argv[4]);
+		if (*log_level < 1 || *log_level > 5) {
+			usage(argv[0]);
+			return false;
+		}
+	}
+
 	return true;
 }
 
 /**
  * Clean the workspace used by chatty
  */
-void clean_workspace() {
+static void clean_workspace() {
 	config_clean();
 	log_destroy();
 }

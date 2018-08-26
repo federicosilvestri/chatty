@@ -88,7 +88,7 @@ static const char message_add_query[] =
 				"VALUES ('%s', '%s', time('now'), '%s', '%d', '%d') ";
 
 static const char message_history_get[] = "SELECT body, is_file FROM messages "
-		"WHERE receiver = '%s'";
+		"WHERE receiver = '%s' ORDER BY ID DESC LIMIT %d";
 
 /**
  * External configuration struct from config
@@ -527,11 +527,12 @@ bool is_file) {
 	return true;
 }
 
-int userman_get_prev_msgs(char *nickname, char ***list, bool **is_files) {
+int userman_get_prev_msgs(char *nickname, char ***list, bool **is_files, int limit) {
 	// query building
 	char *sql = NULL;
 	size_t sql_size = sizeof(message_history_get);
 	sql_size += sizeof(char) * (strlen(nickname) + 1);
+	sql_size += sizeof(char) * 8; // max size of limit number
 
 	sql = calloc(sizeof(char), sql_size);
 
@@ -540,7 +541,7 @@ int userman_get_prev_msgs(char *nickname, char ***list, bool **is_files) {
 		return -1;
 	}
 
-	sprintf(sql, message_history_get, nickname);
+	sprintf(sql, message_history_get, nickname, limit);
 
 	sqlite3_stmt *stmt = NULL;
 	int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
@@ -576,6 +577,12 @@ int userman_get_prev_msgs(char *nickname, char ***list, bool **is_files) {
 			} else {
 				log_fatal(
 						"Unexpected return value from sqlite during user selection");
+				free(sql);
+				free(is_files);
+				for (int j = 0; j < row_count; j++) {
+					free((*list)[j]);
+				}
+				free(*list);
 				return -1;
 			}
 		}

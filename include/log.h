@@ -28,7 +28,7 @@ enum { LOG_TRACE, LOG_DEBUG, LOG_INFO, LOG_WARN, LOG_ERROR, LOG_FATAL };
 /**
  * Initialize internal library objects.
  */
-void log_init();
+void log_init(int level);
 
 /**
  * Setup a file point where write logs.

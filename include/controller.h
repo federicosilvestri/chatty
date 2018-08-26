@@ -22,7 +22,7 @@
 #define SERVER_STATUS_STOPPED 1
 
 /**
- * Constant to define that server is starting.
+ * Constant to define that server is stopping.
  */
 #define SERVER_STATUS_STOPPING 2
 
@@ -67,5 +67,17 @@ bool server_stop();
  * Destroy the server.
  */
 void server_destroy();
+
+/* UTILITY FUNCTIONS */
+
+/**
+ * This function checks the result of
+ * mutex lock or unlock call.
+ * If an error occurs, system will log
+ * a fatal exception and will exit(1);
+ *
+ * @param mutex_res the result of mutex call
+ */
+void check_mutex_lu_call(int mutex_res);
 
 #endif /* CONTROLLER_H */

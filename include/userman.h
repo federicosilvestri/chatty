@@ -137,9 +137,10 @@ bool is_file);
  * @param nickname that identifies the user
  * @param messages the pointer to the message list
  * @param files the pointer to the bool is_file list
+ * @param limit how many message you want to retrieve
  * @return -1 in case of error, the number of messages in case of success
  */
-int userman_get_prev_msgs(char* nickname, char*** messages, bool** files);
+int userman_get_prev_msgs(char* nickname, char*** messages, bool** files, int limit);
 
 /**
  * Deallocate and destroy userman.

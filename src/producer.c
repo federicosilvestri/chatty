@@ -45,7 +45,7 @@
 /**
  * Max connection that producer can handle
  */
-static int max_connections;
+int producer_max_connections;
 
 /**
  * The place where create the socket file
@@ -130,17 +130,17 @@ extern const char *rabmq_exchange;
 static int producer_get_status() {
 	int ret;
 
-	pthread_mutex_lock(&status_mutex);
+	check_mutex_lu_call(pthread_mutex_lock(&status_mutex));
 	ret = status;
-	pthread_mutex_unlock(&status_mutex);
+	check_mutex_lu_call(pthread_mutex_unlock(&status_mutex));
 
 	return ret;
 }
 
 static void producer_set_status(int new_status) {
-	pthread_mutex_lock(&status_mutex);
+	check_mutex_lu_call(pthread_mutex_lock(&status_mutex));
 	status = new_status;
-	pthread_mutex_unlock(&status_mutex);
+	check_mutex_lu_call(pthread_mutex_unlock(&status_mutex));
 }
 
 static bool producer_socket_init() {
@@ -169,7 +169,7 @@ static bool producer_socket_init() {
 	strncpy(listen_socket.sun_path, socket_unix_path, 1 + unix_path_length);
 
 	if (config_lookup_int(&server_conf, "MaxConnections",
-			&max_connections) == CONFIG_FALSE) {
+			&producer_max_connections) == CONFIG_FALSE) {
 		log_error(
 				"Programming error, assertion failed. Cannot get MaxConnections from configuration)");
 		return false;
@@ -200,19 +200,19 @@ static bool producer_socket_init() {
 	}
 
 	// listening
-	if (listen(listen_socket_fd, max_connections) != 0) {
+	if (listen(listen_socket_fd, producer_max_connections) != 0) {
 		log_error("Cannot listen on socket: %s", strerror(errno));
 		return false;
 	}
 
 	// initialize client socket
-	sockets = malloc(sizeof(int) * ((long unsigned int) max_connections));
+	sockets = malloc(sizeof(int) * ((long unsigned int) producer_max_connections));
 	sockets_block = malloc(
-			sizeof(bool) * ((long unsigned int) max_connections));
+			sizeof(bool) * ((long unsigned int) producer_max_connections));
 	sockets_cu_nick = malloc(
-			sizeof(char*) * ((long unsigned int) max_connections));
+			sizeof(char*) * ((long unsigned int) producer_max_connections));
 
-	for (int i = 0; i < max_connections; i++) {
+	for (int i = 0; i < producer_max_connections; i++) {
 		sockets[i] = 0;
 		sockets_block[i] = false;
 		sockets_cu_nick[i] = calloc(sizeof(char),
@@ -252,26 +252,26 @@ bool producer_init() {
 }
 
 void producer_lock_socket(int index) {
-	pthread_mutex_lock(&socket_mutex);
+	check_mutex_lu_call(pthread_mutex_lock(&socket_mutex));
 	if (sockets_block[index] == true) {
 		log_fatal("Socket is already locked.");
 		exit(1);
 	}
 
 	sockets_block[index] = true;
-	pthread_mutex_unlock(&socket_mutex);
+	check_mutex_lu_call(pthread_mutex_unlock(&socket_mutex));
 	log_trace("SOCKET index %d LOCKED", index);
 }
 
 void producer_unlock_socket(int index) {
-	pthread_mutex_lock(&socket_mutex);
+	check_mutex_lu_call(pthread_mutex_lock(&socket_mutex));
 	if (sockets_block[index] == false) {
 		log_fatal("Socket is already unlocked.");
 		exit(1);
 	}
 
 	sockets_block[index] = false;
-	pthread_mutex_unlock(&socket_mutex);
+	check_mutex_lu_call(pthread_mutex_unlock(&socket_mutex));
 	log_trace("SOCKET index %d UNLOCKED", index);
 }
 
@@ -285,18 +285,18 @@ void producer_disconnect_host(int index) {
 }
 
 void producer_set_fd_nickname(int index, char *nickname) {
-	if (index < 0 || index > max_connections) {
+	if (index < 0 || index > producer_max_connections) {
 		log_fatal("Programming error, cannot set an invalid index of socket");
 		return;
 	}
 
-	pthread_mutex_lock(&socket_mutex);
+	check_mutex_lu_call(pthread_mutex_lock(&socket_mutex));
 	if (nickname == NULL) {
 		sockets_cu_nick[index][0] = '\0';
 	} else {
 		strcpy(sockets_cu_nick[index], nickname);
 	}
-	pthread_mutex_unlock(&socket_mutex);
+	check_mutex_lu_call(pthread_mutex_unlock(&socket_mutex));
 }
 
 void producer_get_fd_nickname(int index, char **nickname) {
@@ -305,12 +305,12 @@ void producer_get_fd_nickname(int index, char **nickname) {
 		return;
 	}
 
-	pthread_mutex_lock(&socket_mutex);
+	check_mutex_lu_call(pthread_mutex_lock(&socket_mutex));
 	if (sockets_cu_nick[index][0] != '\0') {
 		*nickname = calloc(sizeof(char), sizeof(char) * (MAX_NAME_LENGTH + 1));
 		strcpy(*nickname, sockets_cu_nick[index]);
 	}
-	pthread_mutex_unlock(&socket_mutex);
+	check_mutex_lu_call(pthread_mutex_unlock(&socket_mutex));
 }
 
 int producer_get_fd_by_nickname(char* nickname) {
@@ -318,22 +318,39 @@ int producer_get_fd_by_nickname(char* nickname) {
 		return -1;
 	}
 
-	pthread_mutex_lock(&socket_mutex);
+	check_mutex_lu_call(pthread_mutex_lock(&socket_mutex));
 	int index = -1;
-	for (int i = 0; i < max_connections && index == -1; i++) {
+	for (int i = 0; i < producer_max_connections && index == -1; i++) {
 		if (strcmp(nickname, sockets_cu_nick[i]) == 0) {
 			index = i;
 		}
 	}
-	pthread_mutex_unlock(&socket_mutex);
+	check_mutex_lu_call(pthread_mutex_unlock(&socket_mutex));
 
 	return index;
+}
+
+int producer_get_fds_n_by_nickname(char *nickname) {
+	if (nickname == NULL) {
+		return -1;
+	}
+
+	check_mutex_lu_call(pthread_mutex_lock(&socket_mutex));
+	int fd_n = 0;
+	for (int i = 0; i < producer_max_connections; i++) {
+		if (strcmp(nickname, sockets_cu_nick[i]) == 0) {
+			fd_n += 1;
+		}
+	}
+	check_mutex_lu_call(pthread_mutex_unlock(&socket_mutex));
+
+	return fd_n;
 }
 
 static inline int get_av_sock_index() {
 	int av = -1;
 
-	for (int i = 0; i < max_connections && av == -1; i++) {
+	for (int i = 0; i < producer_max_connections && av == -1; i++) {
 		if (sockets[i] == 0) {
 			av = i;
 		}
@@ -350,7 +367,7 @@ static inline int run_init_socket_fds() {
 
 	pthread_mutex_lock(&socket_mutex);
 
-	for (int i = 0; i < max_connections; i++) {
+	for (int i = 0; i < producer_max_connections; i++) {
 		int sd = sockets[i];
 
 		// If valid socket descriptor then add to read list
@@ -391,7 +408,7 @@ static inline bool run_manage_new_conn() {
 }
 
 static inline void run_manage_conn() {
-	for (int i = 0; i < max_connections; i++) {
+	for (int i = 0; i < producer_max_connections; i++) {
 		int sd = sockets[i];
 
 		if (FD_ISSET(sd, &read_fds)) {
@@ -416,7 +433,8 @@ static inline void run_manage_conn() {
 				return;
 			}
 
-			log_trace("Socket %d successfully published! %d", sockets[i], pub_status);
+			log_trace("Socket %d successfully published! %d", sockets[i],
+					pub_status);
 		}
 	}
 }
@@ -429,12 +447,11 @@ static inline void run_cleanup() {
 	amqp_channel_close(p_conn, 1, AMQP_REPLY_SUCCESS);
 	amqp_check_error(amqp_get_rpc_reply(p_conn), "Producer closing channel");
 
-	// closing active sockets
-	for (int i = 0; i < max_connections; i++) {
-		if (sockets[i] > 0) {
-			close(sockets[i]);
-		}
-	}
+	/*
+	 * DO NOT CLOSE
+	 * the opened socket.
+	 * leave the close operation to destroy.
+	 */
 }
 
 static void *producer_run() {
@@ -526,6 +543,14 @@ void producer_stop() {
 
 void producer_destroy() {
 	log_debug("Destroying producer");
+
+	// closing active sockets
+	for (int i = 0; i < producer_max_connections; i++) {
+		if (sockets[i] > 0) {
+			close(sockets[i]);
+		}
+	}
+
 	pthread_mutex_destroy(&status_mutex);
 
 	log_debug("Closing listening socket");
@@ -549,7 +574,7 @@ void producer_destroy() {
 	free(sockets);
 	free(sockets_block);
 	// free the sockets nicks matrix
-	for (int i = 0; i < max_connections; i++) {
+	for (int i = 0; i < producer_max_connections; i++) {
 		free(sockets_cu_nick[i]);
 	}
 	free(sockets_cu_nick);

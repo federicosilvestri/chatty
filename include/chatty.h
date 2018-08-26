@@ -13,10 +13,14 @@
  */
 typedef int make_iso_compilers_happy;
 
+#ifndef STD_LOG_LEVEL
+#define STD_LOG_LEVEL 7
+#endif
+
 #include <stdbool.h>
 
-bool check_arguments(int, char**);
-bool parse_config(char*);
-void clean_workspace();
+static bool checkandget_arguments(int, char**, int*);
+
+static void clean_workspace();
 
 #endif //PROJECT_CHATTY_H

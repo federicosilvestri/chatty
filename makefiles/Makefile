@@ -9,7 +9,7 @@
 ##########################################################
 # IMPORTANTE: completare la lista dei file da consegnare
 # 
-FILE_DA_CONSEGNARE=Makefile chatty.c message.h ops.h stats.h config.h \
+FILE_DA_CONSEGNARE=Makefile chatty.c chatty.h message.h ops.h stats.h config.h \
 		   DATA/chatty.conf1 DATA/chatty.conf2 connections.h connections.c \
 		   amqp_utils.c log.c controller.c signal_manager.c \
 		   amqp_utils.h log.h controller.h signal_manager.h \
@@ -62,7 +62,8 @@ TARGETS		= chatty        \
 OBJECTS		= log.o config.o signal_manager.o controller.o connections.o producer.o consumer.o amqp_utils.o worker.o userman.o
 
 # aggiungere qui gli altri include 
-INCLUDE_FILES   = connections.h \
+INCLUDE_FILES   = chatty.h \
+		  connections.h \
 		  message.h     \
 		  ops.h	  	\
 		  stats.h       \

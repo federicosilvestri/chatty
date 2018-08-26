@@ -42,13 +42,18 @@ static const char *level_names[] = { "TRACE", "DEBUG", "INFO", "WARN", "ERROR",
 static const char *level_colors[] = { "\x1b[94m", "\x1b[36m", "\x1b[32m",
 		"\x1b[33m", "\x1b[31m", "\x1b[35m" };
 
-void log_init() {
+void log_init(int level) {
 	if (initialized == true) {
 		return;
 	}
 	initialized = true;
 
 	pthread_mutex_init(&L.lock, NULL);
+	if (level == 6) {
+		log_set_quiet(true);
+	} else {
+		log_set_level(level);
+	}
 }
 
 void log_set_fp(FILE *fp) {
@@ -69,7 +74,11 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
 	}
 
 	// Acquire lock
-	pthread_mutex_lock(&L.lock);
+	if (pthread_mutex_lock(&L.lock) < 0) {
+		fprintf(stderr, "LOG Library cannot lock mutex");
+		fflush(stderr);
+		exit(1);
+	}
 
 	// Get current time
 	time_t t = time(NULL);
@@ -104,7 +113,11 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
 	}
 
 	// Release lock
-	pthread_mutex_unlock(&L.lock);
+	if (pthread_mutex_unlock(&L.lock) < 0) {
+		fprintf(stderr, "LOG Library cannot unlock mutex");
+		fflush(stderr);
+		exit(1);
+	}
 }
 
 void log_destroy() {

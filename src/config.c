@@ -45,19 +45,20 @@ CONFIG_TYPE_STRING, CONFIG_TYPE_STRING, CONFIG_TYPE_INT };
 /**
  * Configuration optional parameters path
  */
-static const char *config_opt_params[] =
-		{ "RabbitMQExchange", "RabbitMQBindKey", "DatabasePathname" };
+static const char *config_opt_params[] = { "RabbitMQExchange",
+		"RabbitMQBindKey", "DatabasePathname", "MaxConcurrentConnectionPerUser" };
 
 /**
  * Configuration optional parameters type
  */
 static const char config_opt_params_type[] = { CONFIG_TYPE_STRING,
-CONFIG_TYPE_STRING, CONFIG_TYPE_STRING };
+CONFIG_TYPE_STRING, CONFIG_TYPE_STRING, CONFIG_TYPE_INT };
 
 /**
  * Configuration optional parameters default value
  */
-static const void *config_opt_params_default_value[] = { "chatty-exchange", "chatty2018", "userman.db" };
+static const char *config_opt_params_default_value[] = { "chatty-exchange",
+		"chatty2018", "userman.db", "2" };
 
 /**
  * Size of array that contains required configuration
@@ -68,7 +69,7 @@ static const void *config_opt_params_default_value[] = { "chatty-exchange", "cha
 /**
  * Size of optional parameters.
  */
-#define CONFIG_OPTIONAL_PARAMS_SIZE 3
+#define CONFIG_OPTIONAL_PARAMS_SIZE 4
 
 /**
  * Main configuration container.
@@ -86,12 +87,14 @@ static void config_load_default(int i, char type) {
 	root = config_root_setting(&server_conf);
 	added = config_setting_add(root, config_opt_params[i], type);
 
+	int int_value;
 	switch (type) {
 	case CONFIG_TYPE_STRING:
 		config_setting_set_string(added, config_opt_params_default_value[i]);
 		break;
 	case CONFIG_TYPE_INT:
-		config_setting_set_string(added, config_opt_params_default_value[i]);
+		int_value = atoi(config_opt_params_default_value[i]);
+		config_setting_set_int(added, int_value);
 		break;
 	}
 }

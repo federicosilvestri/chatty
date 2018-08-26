@@ -42,6 +42,10 @@
 static int status = SERVER_STATUS_STOPPED;
 
 bool server_init() {
+	/*
+	 * DO NOT CHANGE ORDER OF STARTUP.
+	 * IT CAN GENERATE PROBLEMS.
+	 */
 	if (status != SERVER_STATUS_STOPPED) {
 		return false;
 	}
@@ -55,18 +59,26 @@ bool server_init() {
 	}
 
 	if (userman_init() == false) {
-		return false;
-	}
-
-	if (worker_init() == false) {
+		userman_destroy();
 		return false;
 	}
 
 	if (producer_init() == false) {
+		userman_destroy();
+		producer_destroy();
+		return false;
+	}
+
+	if (worker_init() == false) {
+		userman_destroy();
+		producer_destroy();
 		return false;
 	}
 
 	if (consumer_init() == false) {
+		userman_destroy();
+		producer_destroy();
+		consumer_destroy();
 		return false;
 	}
 
@@ -109,6 +121,8 @@ bool server_stop() {
 		return false;
 	}
 
+	status = SERVER_STATUS_STOPPING;
+
 	// stopping producer
 	producer_stop();
 
@@ -117,7 +131,6 @@ bool server_stop() {
 
 	// update status
 	status = SERVER_STATUS_STOPPED;
-
 
 	log_trace("server_stop executed.");
 
@@ -137,4 +150,17 @@ void server_destroy() {
 
 	// userman
 	userman_destroy();
+}
+
+/* UTILITY FUNCTIONS */
+
+void check_mutex_lu_call(int mutex_res) {
+	if (mutex_res == 0) {
+		return;
+	}
+
+	log_fatal("CANNOT LOCK OR UNLOCK MUTEX. PTHREAD LIBRARY FAIL.");
+	log_fatal("PTHREAD ERRNO=$d, STRERR=%s", mutex_res, strerror(mutex_res));
+
+	exit(1);
 }

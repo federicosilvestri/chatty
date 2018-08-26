@@ -52,6 +52,11 @@ extern config_t server_conf;
 extern int *sockets;
 
 /**
+ * How many connections producer is able to support.
+ */
+extern int producer_max_connections;
+
+/**
  * Internal max_message_size configuration parameter.
  */
 static int max_message_size;
@@ -65,6 +70,11 @@ static int max_file_size;
  * Internal max_hist_msgs configuration parameter.
  */
 static int max_hist_msgs;
+
+/**
+ * Internal max_concurrent_user_connections_n parameter.
+ */
+static int max_concurrent_user_connections_n;
 
 /**
  * Internal file_dir_name configuration parameter.
@@ -116,6 +126,19 @@ bool worker_init() {
 		return false;
 	}
 
+	if (config_lookup_int(&server_conf, "MaxConcurrentConnectionPerUser",
+			&max_concurrent_user_connections_n) == CONFIG_FALSE) {
+		log_fatal("Cannot get value for MaxConcurrentConnectionPerUser");
+		return false;
+	}
+
+	if (max_concurrent_user_connections_n < 1
+			|| max_concurrent_user_connections_n > producer_max_connections) {
+		log_fatal(
+				"MaxConcurrentConnectionPerUser cannot be < 1 or > MaxConnections!");
+		return false;
+	}
+
 	init = true;
 
 	return true;
@@ -133,12 +156,30 @@ static void prepare_data(message_data_t *msg, char *nickname) {
 	msg->hdr.len = 0;
 }
 
-static short int check_header(message_hdr_t *hdr) {
-	if (strlen(hdr->sender) == 0) {
-		return 1;
+static bool check_connection(int index, message_t *msg) {
+	// check the sender
+	if (strlen(msg->hdr.sender) == 0) {
+		log_warn("Someone has sent anonymous message, rejecting");
+		// disconnect client brutally
+		producer_disconnect_host(index);
+		// no other operation are possible on socket.
+		return false;
 	}
 
-	return 0;
+	// check concurrent connection
+	int user_conc_conn = producer_get_fds_n_by_nickname(msg->hdr.sender) + 1;
+	if (user_conc_conn > max_concurrent_user_connections_n) {
+		log_warn(
+				"Exceeded concurrent connections per user! conns=%d, maxconcuconn=%d, user=%s",
+				user_conc_conn, max_concurrent_user_connections_n,
+				msg->hdr.sender);
+		// disconnect client brutally
+		producer_disconnect_host(index);
+		// no other operation are possible on socket.
+		return false;
+	}
+
+	return true;
 }
 
 static void worker_user_list(int index, message_t *msg, bool ack, char type) {
@@ -229,9 +270,19 @@ static void worker_deregister_user(int index, message_t *msg) {
 }
 
 static inline void worker_disconnect_user(int index, message_t *msg) {
-	// update status to userman
-	if (userman_set_user_status(msg->hdr.sender, USERMAN_STATUS_OFFL) == false) {
-		log_fatal("Cannot set user offline due to previous errors!");
+	// check if another instance of user is connected
+	int opened_sockets = producer_get_fds_n_by_nickname(msg->hdr.sender);
+
+	// more than one connection
+	if (opened_sockets == 1) {
+		// update status to userman
+		if (userman_set_user_status(msg->hdr.sender,
+		USERMAN_STATUS_OFFL) == false) {
+			log_fatal("Cannot set user offline due to previous errors!");
+		}
+	} else if (opened_sockets <= 0) {
+		log_fatal("Current user is %s, but opened sockets are %d.",
+				msg->hdr.sender, opened_sockets);
 	}
 
 	producer_disconnect_host(index);
@@ -279,7 +330,7 @@ static bool worker_send_live_msg_user(message_t *msg) {
 	 * This function is synchronous respect to message sending.
 	 */
 
-	// try to search the resident socket
+	// try to search the resident sockets
 	int rec_index = producer_get_fd_by_nickname(msg->data.hdr.receiver);
 
 	log_trace("SOCKET INDEX IS %d", rec_index);
@@ -389,11 +440,15 @@ static void worker_get_prev_msgs(int index, message_t *msg) {
 	// try to retrieve messages
 	char **list = NULL;
 	bool *file_list = NULL;
-	int prev_msgs_n = userman_get_prev_msgs(msg->hdr.sender, &list, &file_list);
+	int prev_msgs_n = userman_get_prev_msgs(msg->hdr.sender, &list, &file_list,
+			max_hist_msgs);
 
 	if (prev_msgs_n < 0) {
 		log_fatal(
 				"Cannot continue to send previous messages due to previous error.");
+		ack_reply.op = OP_FAIL;
+	} else if (prev_msgs_n == 0) {
+		// no messages
 		ack_reply.op = OP_FAIL;
 	} else {
 		ack_reply.op = OP_OK;
@@ -561,10 +616,9 @@ void worker_run(amqp_message_t message) {
 		return;
 	}
 
-	if (check_header(&msg.hdr) == 1) {
-		log_warn("Someone has sent anonymous message, rejecting");
-		producer_disconnect_host(index);
-		// no other operation are possible on socket.
+	bool c_check = check_connection(index, &msg);
+	if (c_check == false) {
+		// connection cannot be established.
 		return;
 	}
 
