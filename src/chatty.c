@@ -45,8 +45,10 @@ struct statistics chattyStats = { 0, 0, 0, 0, 0, 0, 0 };
  */
 static void usage(const char *progname) {
 	fprintf(stderr, "Il server va lanciato con il seguente comando:\n");
-	fprintf(stderr, "  %s -f <configuration-file> [ -v 1|2|3|4|5|6|7 ]\n", progname);
-	fprintf(stderr, "  -v means verbose, 1 means TRACE, 7 means QUITE(suppress all messages)\n");
+	fprintf(stderr, "  %s -f <configuration-file> [ -v 1|2|3|4|5|6|7 ]\n",
+			progname);
+	fprintf(stderr,
+			"  -v means verbose, 1 means TRACE, 7 means QUITE(suppress all messages)\n");
 }
 
 /**
@@ -95,17 +97,31 @@ int main(int argc, char *argv[]) {
 	 * One time that server is started, while server is in
 	 * running status, we can wait for incoming signals.
 	 */
-	while (server_status() == SERVER_STATUS_RUNNING) {
+	bool brutal_kill = false;
+	int stop_send = 0;
+	while (server_status() == SERVER_STATUS_RUNNING && !brutal_kill) {
 		log_trace("MAIN THREAD: waiting for server to finish");
 		int action = signal_manager_wait();
 		log_info("woke up from sleeping with signal %d", action);
 
 		switch (action) {
 		case SIGINT:
-		case SIGQUIT:
-			log_info("Received signal that stops server, quitting...");
-			server_stop();
+		case SIGQUIT: {
+			if (server_status() != SERVER_STATUS_STOPPED) {
+				if (stop_send == 0) {
+					log_info("Received signal that stops server, quitting...");
+					server_stop();
+					stop_send += 1;
+				} else if (stop_send < 2){
+					log_warn("Keep calm! Server is stopping... If you want to kill now press again");
+					stop_send += 1;
+				} else {
+					// brutally kill
+					brutal_kill = true;
+				}
+			}
 			break;
+		}
 		case SIGUSR1:
 			log_info("Printing statistics...");
 			// print statistics
@@ -115,6 +131,11 @@ int main(int argc, char *argv[]) {
 			break;
 
 		}
+	}
+
+	if (brutal_kill) {
+		log_error("Server is killed. Possible memory leaks.");
+		return 1;
 	}
 
 	log_debug("Cleaning up...");

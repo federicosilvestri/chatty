@@ -182,6 +182,10 @@ bool rabmq_init(amqp_socket_t **socket, amqp_connection_state_t *conn) {
 }
 
 void rabmq_destroy(amqp_connection_state_t *conn) {
+	if (conn == NULL) {
+		return;
+	}
+
 	// close socket to rabbit
 	log_debug("Closing RabbitMQ connection");
 

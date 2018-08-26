@@ -573,11 +573,17 @@ void worker_run(amqp_message_t message) {
 
 	// access data pointed by body message, i.e. fd
 	int *udata = (int*) message.body.bytes;
-	int index = udata[0];
+	int index = udata[1];
+	int msg_type = udata[0];
+
+	if (msg_type == SERVER_QUEUE_MESSAGE_WRITE_REQ) {
+		// unlock sockets
+		producer_disconnect_host(index);
+		return;
+	}
 
 	message_t msg;
 	int read_size;
-
 	read_size = readMsg(sockets[index], &msg);
 
 	if (read_size == 0) {

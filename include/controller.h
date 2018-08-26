@@ -22,9 +22,15 @@
 #define SERVER_STATUS_STOPPED 1
 
 /**
- * Constant to define that server is stopping.
+ * Constant to define type of message 'command-request'
  */
-#define SERVER_STATUS_STOPPING 2
+#define SERVER_QUEUE_MESSAGE_CMD_REQ 0
+
+/**
+ * Constant to define type of message 'write-request'
+ */
+#define SERVER_QUEUE_MESSAGE_WRITE_REQ 1
+
 
 /**
  * Configuration variable are available externally.
@@ -58,7 +64,10 @@ int server_status();
 
 /**
  * Stop the chatty server using a graceful shutdown.
- *
+ * This function returns immediatly, because
+ * it starts a thread to execute commands
+ * in order.
+ * @param force set true if you want to force the shutdown
  * @return true on success, false on error
  */
 bool server_stop();

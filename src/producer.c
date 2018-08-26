@@ -113,6 +113,11 @@ pthread_mutex_t socket_mutex;
 fd_set read_fds;
 
 /**
+ * Set of write file descriptors
+ */
+fd_set write_fds;
+
+/**
  * Socket structure for RabbitMQ connection
  */
 static amqp_socket_t *p_socket = NULL;
@@ -206,7 +211,8 @@ static bool producer_socket_init() {
 	}
 
 	// initialize client socket
-	sockets = malloc(sizeof(int) * ((long unsigned int) producer_max_connections));
+	sockets = malloc(
+			sizeof(int) * ((long unsigned int) producer_max_connections));
 	sockets_block = malloc(
 			sizeof(bool) * ((long unsigned int) producer_max_connections));
 	sockets_cu_nick = malloc(
@@ -361,7 +367,10 @@ static inline int get_av_sock_index() {
 
 static inline int run_init_socket_fds() {
 	FD_ZERO(&read_fds);
+	FD_ZERO(&write_fds);
+
 	FD_SET(listen_socket_fd, &read_fds);
+	FD_SET(listen_socket_fd, &write_fds);
 
 	int max_sd = listen_socket_fd;
 
@@ -373,6 +382,7 @@ static inline int run_init_socket_fds() {
 		// If valid socket descriptor then add to read list
 		if (sd > 0 && sockets_block[i] == false) {
 			FD_SET(sd, &read_fds);
+			FD_SET(sd, &write_fds);
 		}
 
 		// Highest file descriptor number, need it for the select function
@@ -410,19 +420,39 @@ static inline bool run_manage_new_conn() {
 static inline void run_manage_conn() {
 	for (int i = 0; i < producer_max_connections; i++) {
 		int sd = sockets[i];
+		// check if we need to publish something or not
+		bool publish = false;
+		// message to send
+		int udata[2];
 
 		if (FD_ISSET(sd, &read_fds)) {
 			// pending operation
-			// block the socket
+			udata[0] = SERVER_QUEUE_MESSAGE_CMD_REQ;
+			publish = true;
+		} else if (FD_ISSET(sd, &write_fds)) {
+			/*
+			 *  Data required.
+			 *  This is tipically used  to detect if someone is
+			 *  waiting messages.
+			 */
+			udata[0] = SERVER_QUEUE_MESSAGE_WRITE_REQ;
+			publish = true;
+			log_warn("Here we want dataaaaaa!"); // to remove
+		}
+
+		if (publish == true) {
+			// lock the socket
 			producer_lock_socket(i);
 
-			// prepare the id
-			int udata[1] = { i };
+			// set the socket to process
+			udata[1] = i;
+
+			// message to send to RabbitMQ
 			amqp_bytes_t message_bytes;
-			message_bytes.len = sizeof(int);
+			message_bytes.len = sizeof(int) * 2;
 			message_bytes.bytes = udata;
 
-			// put into queue
+			// push into queue
 			log_trace("Publishing socket %d to the queue...", sockets[i]);
 			int pub_status = amqp_basic_publish(p_conn, 1,
 					amqp_cstring_bytes(rabmq_exchange), amqp_cstring_bytes(""),	// note that it should be the routing-key
@@ -442,6 +472,7 @@ static inline void run_manage_conn() {
 static inline void run_cleanup() {
 	// cleanup read fds
 	FD_ZERO(&read_fds);
+	FD_ZERO(&write_fds);
 
 	// close channel
 	amqp_channel_close(p_conn, 1, AMQP_REPLY_SUCCESS);
@@ -480,8 +511,8 @@ static void *producer_run() {
 		 * Select execution:
 		 * writefs and exceptfs are NULL
 		 */
-		int activity = pselect(max_sd + 1, &read_fds, NULL, NULL, &select_intv,
-				&s_sigset);
+		int activity = pselect(max_sd + 1, &read_fds, &write_fds, NULL,
+				&select_intv, &s_sigset);
 
 		if (activity == -1) {
 			// this is not a big problem
