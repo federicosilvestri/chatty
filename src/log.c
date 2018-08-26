@@ -5,6 +5,13 @@
  * Si dichiara che il contenuto di questo file e' in ogni sua parte opera
  * originale dell'autore.
  *******************************************************************************/
+/**
+ * Simple library to log file.
+ * Not written completely by me, but optimized for POSIX threads
+ * and adapted for this project.
+ *
+ * @file log.c
+ */
 
 /**
  * Define Posix Source

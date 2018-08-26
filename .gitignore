@@ -185,3 +185,6 @@ doc/doxygen
 
 # Test file
 DATA/dev.conf
+
+# Release dir
+Release/

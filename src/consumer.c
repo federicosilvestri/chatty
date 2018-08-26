@@ -6,6 +6,12 @@
  * originale dell'autore.
  *******************************************************************************/
 /**
+ * This file contains the consumer component of the architecture.
+ * The consumer dequeues messages from RabbitMQ and processes it.
+ * @file consumer.c
+ */
+
+/**
  * C POSIX source definition.
  */
 #define _POSIX_C_SOURCE 200809L

@@ -5,6 +5,15 @@
  * Si dichiara che il contenuto di questo file e' in ogni sua parte opera
  * originale dell'autore.
  *******************************************************************************/
+/**
+ * This file is a simple manager of RabbitMQ server.
+ * @file amqp_utils.c
+ */
+
+/**
+ * C POSIX source definition.
+ */
+#define _POSIX_C_SOURCE 200809L
 
 #include <ctype.h>
 #include <stdarg.h>
@@ -19,15 +28,34 @@
 #include "log.h"
 #include "amqp_utils.h"
 
+/**
+ * Status of library
+ */
+static bool initialized;
+
+/**
+ * External configuration from libconfig
+ */
 extern config_t server_conf;
 
-static bool initialized = false;
-
+/**
+ * Hostname of RabbitMQ server
+ */
 static const char *rabmq_hostname;
-static int rabmq_port;
-static int p_status;
 
+/**
+ * Port of RabbitMQ server
+ */
+static int rabmq_port;
+
+/**
+ * The name of RabbitMQ exchange
+ */
 const char *rabmq_exchange;
+
+/**
+ * Bind key of RabbitMQ
+ */
 const char *rabmq_bindkey;
 
 /**
@@ -133,7 +161,7 @@ bool rabmq_init(amqp_socket_t **socket, amqp_connection_state_t *conn) {
 		return false;
 	}
 
-	p_status = amqp_socket_open(*socket, rabmq_hostname, rabmq_port);
+	int p_status = amqp_socket_open(*socket, rabmq_hostname, rabmq_port);
 	if (p_status) {
 		amqp_destroy_connection(*conn);
 		log_error("opening TCP socket");

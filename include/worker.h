@@ -26,8 +26,8 @@ bool worker_init();
  * to a specific socket (passed inside message).
  *
  *
- * @param amqp_message_t message received by RabbitMQ.
+ * @param message received by RabbitMQ.
  */
-void worker_run(amqp_message_t);
+void worker_run(amqp_message_t message);
 
 #endif /* WORKER_H_ */

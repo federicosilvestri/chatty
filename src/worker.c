@@ -5,6 +5,13 @@
  * Si dichiara che il contenuto di questo file e' in ogni sua parte opera
  * originale dell'autore.
  *******************************************************************************/
+/**
+ * This file is the worker component of the architecture.
+ * The worker contains socket-synchronous functions to process
+ * each single message sent by producer and received by consumer.
+ * Each function is thread-safe for definition.
+ * @file worker.c
+ */
 
 /**
  * C Posix source definition.
@@ -28,9 +35,6 @@
 #include "controller.h"
 #include "producer.h"
 #include "userman.h"
-
-// ONLY DEBUG
-extern bool *sockets_block;
 
 /**
  * Variable to register initialization status.
@@ -439,7 +443,6 @@ static void worker_get_prev_msgs(int index, message_t *msg) {
 
 		// free memory
 		free(list[i]);
-
 	}
 
 	// cleanup

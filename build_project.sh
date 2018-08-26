@@ -22,19 +22,19 @@
 echo "Trying to build chatty..."
 
 echo "Cleaning up..."
-rm -rf TestDebug
-mkdir -p TestDebug/src
+rm -rf Release
+mkdir -p Release/src
 
 echo "Copying files..."
-cp -r ./src/* TestDebug/
-cp -r ./include/* TestDebug/
-cp ./makefiles/Makefile TestDebug/
-cp -r ./scripts/* TestDebug/
-cp -r ./DATA TestDebug/
-chmod a+x ./TestDebug/*.sh
+cp -r ./src/* Release/
+cp -r ./include/* Release/
+cp ./makefiles/Makefile Release/
+cp -r ./scripts/* Release/
+cp -r ./DATA Release/
+chmod a+x ./Release/*.sh
 
 echo "Launching make..."
-cd TestDebug
+cd Release
 ls -a
 
 echo "Making deps"
@@ -42,13 +42,6 @@ make deps
 
 echo "Making chatty"
 make chatty
-
-for (( i=2; i <= 10; ++i ))
-do
-    echo "Make test1"
-    make test1
-done
-
 
 echo "Making docs"
 cd ..

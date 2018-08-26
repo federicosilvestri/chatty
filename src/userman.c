@@ -6,6 +6,13 @@
  * originale dell'autore.
  *******************************************************************************/
 /**
+ * This file contains utility functions
+ * to manage users and groups using SQLite3 Database.
+ * Each function is thread-safe for definition.
+ * @file userman.c
+ */
+
+/**
  * C POSIX source definition.
  */
 #define _POSIX_C_SOURCE 200809L
@@ -33,6 +40,11 @@
 #include "controller.h"
 #include "worker.h"
 
+/**
+ * This MACRO simplify code
+ * during user list creation.
+ * It calculates the size of user list.
+ */
 #define __USERLIST_SIZE(X) ((size_t)((MAX_NAME_LENGTH + 1) * ((int) sizeof(char)) * (X)))
 
 static const char create_db_sql[] = "CREATE TABLE users("
@@ -206,47 +218,6 @@ bool userman_init() {
 
 	return true;
 }
-
-//static int sqlite_exec_nc(const char *sql) {
-//	sqlite3_stmt *stmt = NULL;
-//	int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
-//	if (rc != SQLITE_OK)
-//		return rc;
-//
-//	int rowCount = 0;
-//	rc = sqlite3_step(stmt);
-//
-//	while (rc != SQLITE_DONE && rc != SQLITE_OK) {
-//		rowCount++;
-//		int colCount = sqlite3_column_count(stmt);
-//		for (int colIndex = 0; colIndex < colCount; colIndex++) {
-//			int type = sqlite3_column_type(stmt, colIndex);
-////			const char * columnName = sqlite3_column_name(stmt, colIndex);
-//
-//			if (type == SQLITE_INTEGER) {
-////				int valInt = sqlite3_column_int(stmt, colIndex);
-//
-//			} else if (type == SQLITE_FLOAT) {
-////				double valDouble = sqlite3_column_double(stmt, colIndex);
-//
-//			} else if (type == SQLITE_TEXT) {
-////				const unsigned char *valChar = sqlite3_column_text(stmt,
-////						colIndex);
-////
-//
-//			} else if (type == SQLITE_BLOB) {
-//
-//			} else if (type == SQLITE_NULL) {
-//
-//			}
-//		}
-//
-//		rc = sqlite3_step(stmt);
-//	}
-//
-//	rc = sqlite3_finalize(stmt);
-//	return rc;
-//}
 
 bool userman_user_exists(char *nickname) {
 	// query composition
@@ -591,8 +562,7 @@ int userman_get_prev_msgs(char *nickname, char ***list, bool **is_files) {
 			int type = sqlite3_column_type(stmt, colIndex);
 
 			if (type == SQLITE_TEXT) {
-				const char *body = (char*) sqlite3_column_text(stmt,
-						colIndex);
+				const char *body = (char*) sqlite3_column_text(stmt, colIndex);
 				if (body == NULL) {
 					log_fatal("Cannot retrieve field from SQLITE.");
 					return -1;
@@ -615,8 +585,9 @@ int userman_get_prev_msgs(char *nickname, char ***list, bool **is_files) {
 
 		// check if need to realloc
 		if (rc != SQLITE_DONE) {
-			*list = realloc(*list, sizeof(char**) * (size_t)(row_count + 1));
-			*is_files = realloc(*is_files, sizeof(bool*) * (size_t)(row_count + 1));
+			*list = realloc(*list, sizeof(char**) * (size_t) (row_count + 1));
+			*is_files = realloc(*is_files,
+					sizeof(bool*) * (size_t) (row_count + 1));
 		}
 	}
 

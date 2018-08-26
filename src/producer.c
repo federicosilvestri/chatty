@@ -6,6 +6,13 @@
  * originale dell'autore.
  *******************************************************************************/
 /**
+ * This file contains functions related to producer component.
+ * Producer is the component that produces requests to be sent
+ * to queue.
+ * @file producer.c
+ */
+
+/**
  * C POSIX source definition.
  */
 #define _POSIX_C_SOURCE 200809L
@@ -35,10 +42,29 @@
 #include "log.h"
 #include "amqp_utils.h"
 
+/**
+ * Max connection that producer can handle
+ */
 static int max_connections;
+
+/**
+ * The place where create the socket file
+ */
 static const char *socket_unix_path;
+
+/**
+ * POSIX struct for listen socket
+ */
 static struct sockaddr_un listen_socket;
+
+/**
+ * Listen file descriptor
+ */
 static int listen_socket_fd;
+
+/**
+ * Time interval for select function
+ */
 static const struct timespec select_intv = { 0, 500 };
 
 /**
@@ -58,29 +84,47 @@ static pthread_mutex_t status_mutex;
 
 /**
  * Array (dynamically allocated) that contains
- * all socket file descriptors.
+ * all socket file descriptors
  */
 int *sockets;
 
 /**
  * Array (dynamically allocated) that contains a
  * boolean value to check if socket file descriptor
- * is in use or not.
+ * is in use or not
  */
 static bool *sockets_block;
 
 /**
  * Array (partially dynamically allocated) that contains a
- * string value of user that is connected to the current socket.
+ * string value of user that is connected to the current socket
  */
 static char **sockets_cu_nick;
 
+/**
+ * Mutex for giving an exclusive access
+ * to array of sockets
+ */
 pthread_mutex_t socket_mutex;
 
+/**
+ * Set of read file descriptor
+ */
 fd_set read_fds;
 
+/**
+ * Socket structure for RabbitMQ connection
+ */
 static amqp_socket_t *p_socket = NULL;
+
+/**
+ * State of RabbitMQ connection
+ */
 static amqp_connection_state_t p_conn;
+
+/**
+ * The name of the exchange for RabbitMQ
+ */
 extern const char *rabmq_exchange;
 
 static int producer_get_status() {
@@ -99,11 +143,119 @@ static void producer_set_status(int new_status) {
 	pthread_mutex_unlock(&status_mutex);
 }
 
+static bool producer_socket_init() {
+	// Preparing socket structure
+	listen_socket.sun_family = AF_UNIX; // Use AF_UNIX
+	if (config_lookup_string(&server_conf, "UnixPath",
+			&socket_unix_path) == CONFIG_FALSE) {
+		log_error(
+				"Programming error, assertion failed. Cannot get UnixPath from configuration");
+		return false;
+	}
+
+	size_t unix_path_length = strlen(socket_unix_path);
+	if (unix_path_length > 107) {
+		log_error(
+				"Length of 'UnixPath' parameter is greater than 107 character.");
+		return false;
+	}
+
+	// check if file already exists
+	if (access(socket_unix_path, F_OK) == 0) {
+		log_error("Socket already exists! Is chatty running?");
+		return false;
+	}
+
+	strncpy(listen_socket.sun_path, socket_unix_path, 1 + unix_path_length);
+
+	if (config_lookup_int(&server_conf, "MaxConnections",
+			&max_connections) == CONFIG_FALSE) {
+		log_error(
+				"Programming error, assertion failed. Cannot get MaxConnections from configuration)");
+		return false;
+	}
+
+	// Creating socket file descriptor
+	log_debug("Creating AF_UNIX socket...");
+	listen_socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+
+	if (listen_socket_fd < 0) {
+		log_error("Cannot create socket: %s", strerror(errno));
+		return false;
+	}
+
+	int opt = true;
+	// Handle multiple connections
+	if (setsockopt(listen_socket_fd, SOL_SOCKET, SO_REUSEADDR, (char *) &opt,
+			sizeof(opt)) < 0) {
+		log_error("Cannot change socket options: %s", strerror(errno));
+		return false;
+	}
+
+	// Binding
+	if (bind(listen_socket_fd, (const struct sockaddr*) &listen_socket,
+			sizeof(listen_socket)) != 0) {
+		log_error("Cannot bind socket address!: %s", strerror(errno));
+		return false;
+	}
+
+	// listening
+	if (listen(listen_socket_fd, max_connections) != 0) {
+		log_error("Cannot listen on socket: %s", strerror(errno));
+		return false;
+	}
+
+	// initialize client socket
+	sockets = malloc(sizeof(int) * ((long unsigned int) max_connections));
+	sockets_block = malloc(
+			sizeof(bool) * ((long unsigned int) max_connections));
+	sockets_cu_nick = malloc(
+			sizeof(char*) * ((long unsigned int) max_connections));
+
+	for (int i = 0; i < max_connections; i++) {
+		sockets[i] = 0;
+		sockets_block[i] = false;
+		sockets_cu_nick[i] = calloc(sizeof(char),
+				sizeof(char) * (MAX_NAME_LENGTH + 1));
+	}
+
+	return true;
+}
+
+/**
+ * @brief initializes all workspace for producer
+ * @return true on success, false on error
+ */
+bool producer_init() {
+	static bool initialized = false;
+
+	if (initialized == true) {
+		log_fatal("Producer is already initialized!");
+		return false;
+	}
+
+	// initialize mutex
+	pthread_mutex_init(&status_mutex, NULL);
+
+	if (!producer_socket_init()) {
+		return false;
+	}
+
+	if (!rabmq_init(&p_socket, &p_conn)) {
+		return false;
+	}
+
+	status = SERVER_STATUS_STOPPED;
+	initialized = true;
+
+	return true;
+}
+
 void producer_lock_socket(int index) {
 	pthread_mutex_lock(&socket_mutex);
 	if (sockets_block[index] == true) {
 		log_fatal("Socket is already locked.");
-		//exit(1);
+		exit(1);
 	}
 
 	sockets_block[index] = true;
@@ -178,124 +330,6 @@ int producer_get_fd_by_nickname(char* nickname) {
 	return index;
 }
 
-/**
- * Socket creation and initialization.
- *
- * @brief create listening socket for incoming connections
- * @return true on success, false on error
- */
-static bool producer_socket_init() {
-	// Preparing socket structure
-	listen_socket.sun_family = AF_UNIX; // Use AF_UNIX
-	if (config_lookup_string(&server_conf, "UnixPath",
-			&socket_unix_path) == CONFIG_FALSE) {
-		log_error(
-				"Programming error, assertion failed. Cannot get UnixPath from configuration");
-		return false;
-	}
-
-	size_t unix_path_length = strlen(socket_unix_path);
-	if (unix_path_length > 107) {
-		log_error(
-				"Length of 'UnixPath' parameter is greater than 107 character.");
-		return false;
-	}
-
-	// check if file already exists
-	if (access(socket_unix_path, F_OK) == 0) {
-		log_error("Socket already exists! Is chatty running?");
-		return false;
-	}
-
-	strncpy(listen_socket.sun_path, socket_unix_path, 1 + unix_path_length);
-
-	if (config_lookup_int(&server_conf, "MaxConnections",
-			&max_connections) == CONFIG_FALSE) {
-		log_error(
-				"Programming error, assertion failed. Cannot get MaxConnections from configuration)");
-		return false;
-	}
-
-	// Creating socket file descriptor
-	log_debug("Creating AF_UNIX socket...");
-	listen_socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-
-	if (listen_socket_fd < 0) {
-		log_error("Cannot create socket: %s", strerror(errno));
-		return false;
-	}
-
-	int opt = true;
-	// Handle multiple connections
-	if (setsockopt(listen_socket_fd, SOL_SOCKET, SO_REUSEADDR, (char *) &opt,
-			sizeof(opt)) < 0) {
-		log_error("Cannot change socket options: %s", strerror(errno));
-		return false;
-	}
-
-	// Binding
-	if (bind(listen_socket_fd, (const struct sockaddr*) &listen_socket,
-			sizeof(listen_socket)) != 0) {
-		log_error("Cannot bind socket address!: %s", strerror(errno));
-		return false;
-	}
-
-	// listening
-	if (listen(listen_socket_fd, max_connections) != 0) {
-		log_error("Cannot listen on socket: %s", strerror(errno));
-		return false;
-	}
-
-	// initialize client socket
-	sockets = malloc(sizeof(int) * ((long unsigned int) max_connections));
-	sockets_block = malloc(
-			sizeof(bool) * ((long unsigned int) max_connections));
-	sockets_cu_nick = malloc(
-			sizeof(char*) * ((long unsigned int) max_connections));
-
-	for (int i = 0; i < max_connections; i++) {
-		sockets[i] = 0;
-		sockets_block[i] = false;
-		sockets_cu_nick[i] = calloc(sizeof(char), sizeof(char) * (MAX_NAME_LENGTH + 1));
-	}
-
-	return true;
-}
-
-/**
- * @brief initializes all workspace for producer
- * @return true on success, false on error
- */
-bool producer_init() {
-	static bool initialized = false;
-
-	if (initialized == true) {
-		log_fatal("Producer is already initialized!");
-		return false;
-	}
-
-	// initialize mutex
-	pthread_mutex_init(&status_mutex, NULL);
-
-	if (!producer_socket_init()) {
-		return false;
-	}
-
-	if (!rabmq_init(&p_socket, &p_conn)) {
-		return false;
-	}
-
-	status = SERVER_STATUS_STOPPED;
-	initialized = true;
-
-	return true;
-}
-
-/**
- * Get available index for socket.
- *
- * @return -1 if no available sockets index, else the index
- */
 static inline int get_av_sock_index() {
 	int av = -1;
 
@@ -308,11 +342,6 @@ static inline int get_av_sock_index() {
 	return av;
 }
 
-/**
- * Initialize socket file descriptors.
- *
- * @return the maximum file descriptor
- */
 static inline int run_init_socket_fds() {
 	FD_ZERO(&read_fds);
 	FD_SET(listen_socket_fd, &read_fds);
@@ -340,11 +369,6 @@ static inline int run_init_socket_fds() {
 	return max_sd;
 }
 
-/**
- * Manage, if it is pending, new connection.
- *
- * @return true if connection is set up, false if not
- */
 static inline bool run_manage_new_conn() {
 	if (FD_ISSET(listen_socket_fd, &read_fds)) {
 		int new_socket = accept(listen_socket_fd, NULL, 0);
@@ -354,7 +378,7 @@ static inline bool run_manage_new_conn() {
 			return false; // do not exit, log error and try again
 		}
 
-		log_info("New connection , socket fd is %d", new_socket);
+		log_info("New connection, socket fd is %d", new_socket);
 
 		// add new socket to array of sockets using last index
 		int av = get_av_sock_index();
@@ -366,10 +390,6 @@ static inline bool run_manage_new_conn() {
 	return false;
 }
 
-/**
- * Manage the active connection.
- * If a message is in the queue, it will be sent to RabbitMQ (the consumer queue).
- */
 static inline void run_manage_conn() {
 	for (int i = 0; i < max_connections; i++) {
 		int sd = sockets[i];
@@ -386,7 +406,7 @@ static inline void run_manage_conn() {
 			message_bytes.bytes = udata;
 
 			// put into queue
-			log_trace("Publishing to queue...");
+			log_trace("Publishing socket %d to the queue...", sockets[i]);
 			int pub_status = amqp_basic_publish(p_conn, 1,
 					amqp_cstring_bytes(rabmq_exchange), amqp_cstring_bytes(""),	// note that it should be the routing-key
 					0, 0, NULL, message_bytes);
@@ -396,23 +416,20 @@ static inline void run_manage_conn() {
 				return;
 			}
 
-			log_info("Message successfully published! %d", pub_status);
+			log_trace("Socket %d successfully published! %d", sockets[i], pub_status);
 		}
 	}
 }
 
-/**
- * Clean up workspace set up by producer run thread.
- */
 static inline void run_cleanup() {
-// cleanup read fds
+	// cleanup read fds
 	FD_ZERO(&read_fds);
 
-// close channel
+	// close channel
 	amqp_channel_close(p_conn, 1, AMQP_REPLY_SUCCESS);
 	amqp_check_error(amqp_get_rpc_reply(p_conn), "Producer closing channel");
 
-// closing active sockets
+	// closing active sockets
 	for (int i = 0; i < max_connections; i++) {
 		if (sockets[i] > 0) {
 			close(sockets[i]);
@@ -420,24 +437,17 @@ static inline void run_cleanup() {
 	}
 }
 
-/**
- *
- * This function is the thread function that is executed
- * by producer thread,
- *
- * @param params parameters of standard routine thread
- */
 static void *producer_run() {
 	log_debug("[PRODUCER THREAD] started");
 
-// set blocking signals for select to avoid bad connections
+	// set blocking signals for select to avoid bad connections
 	sigset_t s_sigset;
 	sigemptyset(&s_sigset);
 	sigaddset(&s_sigset, SIGINT);
 	sigaddset(&s_sigset, SIGQUIT);
 	sigprocmask(SIG_BLOCK, &s_sigset, NULL);
 
-//	// open channel to rabbit
+	// open channel to rabbit
 	amqp_channel_open(p_conn, 1);
 	if (amqp_check_error(amqp_get_rpc_reply(p_conn),
 			"Producer opening channel") == true) {
@@ -515,27 +525,26 @@ void producer_stop() {
 }
 
 void producer_destroy() {
-// wait until man thread is not terminated
 	log_debug("Destroying producer");
 	pthread_mutex_destroy(&status_mutex);
 
 	log_debug("Closing listening socket");
-// closing socket connection
+	// closing socket connection
 	if (close(listen_socket_fd) < 0) {
 		log_error("Cannot close listen socket file descriptor");
 	}
 
 	log_debug("Deleting socket file");
-// deleting UNIX socket
+	// deleting UNIX socket
 	if (unlink(socket_unix_path) != 0) {
 		log_error("Cannot delete Unix socket file");
 	}
 
-// Destroy RabbitMQ connection
+	// Destroy RabbitMQ connection
 	log_debug("Destroying RabbitMQ connection");
 	rabmq_destroy(&p_conn);
 
-// Destroying sockets
+	// Destroying sockets
 	log_debug("Destroying sockets array");
 	free(sockets);
 	free(sockets_block);
@@ -544,5 +553,4 @@ void producer_destroy() {
 		free(sockets_cu_nick[i]);
 	}
 	free(sockets_cu_nick);
-
 }

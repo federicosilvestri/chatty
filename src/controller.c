@@ -6,6 +6,12 @@
  * originale dell'autore.
  *******************************************************************************/
 /**
+ * This file contains the controller component of architecture.
+ * Controller is responsible for consumer and producer creation and
+ * control.
+ * @file controller.c
+ */
+/**
  * C POSIX source definition.
  */
 #define _POSIX_C_SOURCE 200809L

@@ -69,7 +69,7 @@ bool userman_init();
  * @param nickname of user
  * @return true if exists, false if not
  */
-bool userman_user_exists(char*);
+bool userman_user_exists(char* nickname);
 
 /**
  * This function adds user to system, in case of error a specific
@@ -79,7 +79,7 @@ bool userman_user_exists(char*);
  * @param nickname of a new user
  * @return 0 on success, 1 on already exists, 2 on invalid nickname, 3 on other fatal error
  */
-int userman_add_user(char*);
+int userman_add_user(char *nickname);
 
 /**
  * This function will delete a user from system, in case of
@@ -88,7 +88,7 @@ int userman_add_user(char*);
  * @param nickname that identifies user to delete
  * @return true on success, false on error
  */
-bool userman_delete_user(char*);
+bool userman_delete_user(char* nickname);
 
 /**
  * This functions returns an array
@@ -96,10 +96,10 @@ bool userman_delete_user(char*);
  * Note that array is composed
  *
  * @param option an option available ALL, ONL, OFFL
- * @param string a pointer to string (internally allocated and built)
+ * @param list string a pointer to string (internally allocated and built)
  * @return -1 if any error occurs, else the number of the selected user.
  */
-size_t userman_get_users(char, char**);
+size_t userman_get_users(char option, char** list);
 
 /**
  * Update the status of user: online or offline.
@@ -108,7 +108,7 @@ size_t userman_get_users(char, char**);
  * @param status set true if online, false if offline
  * @return false in case of error, true in case of success
  */
-bool userman_set_user_status(char*, bool);
+bool userman_set_user_status(char* nickname, bool status);
 
 /**
  * Checks if user is online or not.
@@ -135,11 +135,11 @@ bool is_file);
  * Get the previous messages of users.
  *
  * @param nickname that identifies the user
- * @param the pointer to the message list
- * @param the pointer to the bool is_file list
+ * @param messages the pointer to the message list
+ * @param files the pointer to the bool is_file list
  * @return -1 in case of error, the number of messages in case of success
  */
-int userman_get_prev_msgs(char *, char***, bool**);
+int userman_get_prev_msgs(char* nickname, char*** messages, bool** files);
 
 /**
  * Deallocate and destroy userman.

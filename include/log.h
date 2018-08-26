@@ -50,6 +50,14 @@ void log_set_level(int level);
  */
 void log_set_quiet(bool enable);
 
+/**
+ * Log a string.
+ *
+ * @param level level of the log
+ * @param file file to log
+ * @param line line to log
+ * @param fmt parameters to pass to printf
+ */
 void log_log(int level, const char *file, int line, const char *fmt, ...);
 
 /**

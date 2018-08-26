@@ -52,11 +52,15 @@ bool amqp_check_error(amqp_rpc_reply_t x, char const *context);
 /**
  * Destroy connection and socket to RabbitMQ.
  *
- * @param socket socket to destroy
  * @param conn connection to destroy
  */
 void rabmq_destroy(amqp_connection_state_t *conn);
 
+/**
+ * It dumps useful information about queue.
+ * @param buffer buffer of queue
+ * @param len length of buffer
+ */
 void amqp_dump(void const *buffer, size_t len);
 
 #endif /* AMQP_UTILS_H_ */

@@ -5,6 +5,11 @@
  * Si dichiara che il contenuto di questo file e' in ogni sua parte opera
  * originale dell'autore.
  *******************************************************************************/
+/**
+ * This file is the configuration manager of project.
+ * It is a wrapper of "libconfig" library.
+ * @file config.c
+ */
 
 /**
  * C POSIX source definition.
@@ -75,7 +80,6 @@ config_t server_conf;
  * @param index of parameter
  * @param type of parameter
  */
-
 static void config_load_default(int i, char type) {
 	struct config_setting_t *root, *added;
 

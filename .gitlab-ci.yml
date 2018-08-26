@@ -1,4 +1,4 @@
-image: ubuntu
+image: ubuntu16.04
 
 build:
   stage: build
@@ -6,8 +6,12 @@ build:
      - export DEBIAN_FRONTEND=noninteractive
      - apt update && apt -y install make gcc valgrind doxygen graphviz
   script: 
-    - /bin/bash test_build.sh
+    - /bin/bash build_project.sh
   artifacts:
     paths:
       - bin
       - doc/doxygen
+test:
+    stage: test
+    script:
+        - /bin/bash Release/test_project.sh
