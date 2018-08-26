@@ -9,7 +9,7 @@ build:
     - /bin/bash build_project.sh
   artifacts:
     paths:
-      - bin
+      - Release
       - doc/doxygen
 test:
     stage: test
