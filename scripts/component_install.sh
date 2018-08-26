@@ -46,14 +46,6 @@ else
 	exit 1
 fi
 
-echo "Checking if RabbitMQ is running..."
-if [ -n "$($su_cmd service rabbitmq-server status | grep ' active ')" ]; then
-	echo "OK"
-else
-	echo "Service is not running, throwing error..."
-	exit 1
-fi
-
 echo "Checking if RabbitMQ is listening on port $rabbitmq_port"
 
 if [ -n "$($su_cmd netstat -tlpn | grep ":$rabbitmq_port ")" ]; then
