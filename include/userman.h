@@ -58,6 +58,23 @@ typedef struct {
 #define USERMAN_STATUS_OFFL false
 
 /**
+ * Constant to get only read messages
+ */
+#define USERMAN_GET_MSGS_READ 1
+
+/**
+ *
+ * Constant to get only unread messages
+ */
+#define USERMAN_GET_MSGS_UNREAD 0
+
+/**
+ * Constant to get all messages (read and unread)
+ * @return
+ */
+#define USERMAN_GET_MSGS_ALL 2
+
+/**
  * Initializes userman.
  * @return true on success, false on error.
  */
@@ -132,15 +149,37 @@ bool userman_add_message(char *sender, char *receiver, bool read, char *body,
 bool is_file);
 
 /**
- * Get the previous messages of users.
+ * Get the messages of users.
  *
  * @param nickname that identifies the user
  * @param messages the pointer to the message list
+ * @param senders an array that contains sender of message, set NULL  if don't want
+ * @param ids the ids of messages, set to NULL if you don't want
  * @param files the pointer to the bool is_file list
+ * @param read set 0 to get messages that are not read, 1 to get messages that are read,
  * @param limit how many message you want to retrieve
  * @return -1 in case of error, the number of messages in case of success
  */
-int userman_get_prev_msgs(char* nickname, char*** messages, bool** files, int limit);
+int userman_get_msgs(char* nickname, char*** messages, char ***senders, int **ids, bool** files, unsigned short int read, int limit);
+
+/**
+ * Free the memory used to store messages
+ *
+ * @param messages message list pointer
+ * @param senders  sender list pointer
+ * @param msg_size how many messages we have in the array
+ * @param ids ids array pointer
+ * @param is_files is_file array pointer
+ */
+void userman_free_msgs(char ***messages, char ***senders, int msg_size, int **ids, bool **is_files);
+
+/**
+ * Set message status, read or unread.
+ * @param msgid the id of message
+ * @param read true if you want to set to read, false to set to unread
+ * @return true on success, false on error
+ */
+bool userman_set_msg_status(int msgid, bool read);
 
 /**
  * Deallocate and destroy userman.

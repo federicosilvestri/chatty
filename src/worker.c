@@ -325,43 +325,6 @@ static inline void worker_connect_user(int index, message_t *msg) {
 	}
 }
 
-static bool worker_send_live_msg_user(message_t *msg) {
-	/*
-	 * This function is synchronous respect to message sending.
-	 */
-
-	// try to search the resident sockets
-	int rec_index = producer_get_fd_by_nickname(msg->data.hdr.receiver);
-
-	log_trace("SOCKET INDEX IS %d", rec_index);
-	if (rec_index < 0) {
-		// user isn't connected.
-		return false;
-	}
-
-	// lock the socket POSSIBLE ERROR DURING LOCKING
-	//producer_lock_socket(rec_index);
-	message_t reply;
-	prepare_header(&reply.hdr);
-	prepare_data(&reply.data, msg->data.hdr.receiver);
-
-	reply.hdr.op = TXT_MESSAGE;
-	strcpy(reply.hdr.sender, msg->hdr.sender);
-	strcpy(reply.data.hdr.receiver, msg->data.hdr.receiver);
-	reply.data.hdr.len = msg->data.hdr.len;
-	reply.data.buf = msg->data.buf;
-
-	// send message
-	if (sendRequest(sockets[rec_index], &reply) <= 0) {
-		log_warn("Cannot send message to user...");
-		return false;
-	}
-
-	log_warn("Message sent to user!");
-
-	return true;
-}
-
 static void worker_posttxt(int index, message_t *msg) {
 	// prepare the reply
 	message_hdr_t reply_hdr;
@@ -399,28 +362,10 @@ static void worker_posttxt(int index, message_t *msg) {
 	}
 
 	if (!stop) {
-		// if sender == receiver, send in background
-		if (strcmp(msg->hdr.sender, msg->data.hdr.receiver) == 0) {
-			userman_add_message(msg->hdr.sender, msg->data.hdr.receiver,
-			false, msg->data.buf, false);
-			reply_hdr.op = OP_OK;
-
-			// check if user is online
-		} else if (userman_user_is_online(msg->data.hdr.receiver) == true) {
-			// send message directly
-			log_trace("SENDING LIVE MESSAGE");
-			bool delivery = worker_send_live_msg_user(msg);
-
-			userman_add_message(msg->hdr.sender, msg->data.hdr.receiver,
-					delivery, msg->data.buf, false);
-
-			reply_hdr.op = OP_OK;
-		} else {
-			// send to DB.
-			userman_add_message(msg->hdr.sender, msg->data.hdr.receiver, false,
-					msg->data.buf, false);
-			reply_hdr.op = OP_OK;
-		}
+		// send to DB.
+		userman_add_message(msg->hdr.sender, msg->data.hdr.receiver, false,
+				msg->data.buf, false);
+		reply_hdr.op = OP_OK;
 	}
 
 	// an error is occurred, send header and stop.
@@ -439,9 +384,12 @@ static void worker_get_prev_msgs(int index, message_t *msg) {
 
 	// try to retrieve messages
 	char **list = NULL;
-	bool *file_list = NULL;
-	int prev_msgs_n = userman_get_prev_msgs(msg->hdr.sender, &list, &file_list,
-			max_hist_msgs);
+	char **senders = NULL;
+	bool *is_file_list = NULL;
+	int *ids = NULL;
+	int prev_msgs_n = userman_get_msgs(msg->hdr.sender, &list, &senders, &ids,
+			&is_file_list,
+			USERMAN_GET_MSGS_ALL, max_hist_msgs);
 
 	if (prev_msgs_n < 0) {
 		log_fatal(
@@ -457,10 +405,12 @@ static void worker_get_prev_msgs(int index, message_t *msg) {
 	// send ack response
 	if (sendHeader(sockets[index], &ack_reply) < 0) {
 		log_fatal("Cannot send ack to client!");
+		userman_free_msgs(&list, NULL, prev_msgs_n, NULL, &is_file_list);
 		return;
 	}
 
 	if (ack_reply.op == OP_FAIL) {
+		userman_free_msgs(&list, NULL, prev_msgs_n, NULL, &is_file_list);
 		return;
 	}
 
@@ -474,35 +424,47 @@ static void worker_get_prev_msgs(int index, message_t *msg) {
 
 	if (sendData(sockets[index], &reply.data) < 0) {
 		log_fatal("Cannot send message due to previous error!");
+		userman_free_msgs(&list, NULL, prev_msgs_n, NULL, &is_file_list);
 		return;
 	}
 
 	// now send the payloads
 	for (int i = 0; i < prev_msgs_n; i++) {
+		// set the sender
+		strcpy(reply.hdr.sender, senders[i]);
+
 		// prepare the message
 		reply.data.hdr.len =
 				(unsigned int) (strlen(list[i]) + 1 * sizeof(char));
 		reply.data.buf = list[i];
-		reply.hdr.op = file_list[i] == true ? FILE_MESSAGE : TXT_MESSAGE;
+		reply.hdr.op = is_file_list[i] == true ? FILE_MESSAGE : TXT_MESSAGE;
 
 		// send message
 		if (sendRequest(sockets[index], &reply) < 0) {
 			log_fatal("Cannot send message!");
 		}
 
-		if (file_list[i] == true) {
+		if (is_file_list[i] == true) {
 			// it's a file!
 			log_fatal("Function not implemented.");
 
 		}
 
+		// update message status
+		if (userman_set_msg_status(ids[i], true) == false) {
+			log_fatal("Cannot update status of message due to previous error.");
+		}
+
 		// free memory
 		free(list[i]);
+		free(senders[i]);
 	}
 
 	// cleanup
-	free(file_list);
+	free(is_file_list);
+	free(ids);
 	free(list);
+	free(senders);
 }
 
 static int worker_action_router(int index, message_t *msg) {
@@ -548,7 +510,7 @@ static int worker_action_router(int index, message_t *msg) {
 	case CREATEGROUP_OP:
 	case ADDGROUP_OP:
 	case DELGROUP_OP:
-		// optional
+// optional
 		log_fatal("OPTIONAL NOT IMPLEMENTED");
 		ret = -1;
 		break;
@@ -559,6 +521,95 @@ static int worker_action_router(int index, message_t *msg) {
 	}
 
 	return ret;
+}
+
+static void worker_send_live_message(int index) {
+	char *nickname = NULL;
+
+	// retrieve nickname from socket file descriptor
+	producer_get_fd_nickname(index, &nickname);
+
+	if (nickname == NULL) {
+		// previously host hasn't sent the nickname, close connection
+		producer_unlock_socket(index);
+		return;
+	}
+
+	// preparing reply message
+	message_t reply;
+	prepare_header(&reply.hdr);
+	prepare_data(&reply.data, nickname);
+
+	// check for pending messages
+	char **messages = NULL;
+	char **senders = NULL;
+	int *ids = NULL;
+	bool *is_files = NULL;
+	int row_count;
+
+	row_count = userman_get_msgs(nickname, &messages, &senders, &ids, &is_files,
+			USERMAN_GET_MSGS_UNREAD, 100);
+
+	if (row_count < 0) {
+		/*
+		 * general failure of database, error is already printed
+		 */
+		reply.hdr.op = OP_FAIL;
+	} else if (row_count == 0) {
+		/*
+		 * no pending messages for this user,
+		 * memory is already freed by userman_get_msgs function.
+		 * release socket, in this way this thread will be free
+		 * to process other requests in the queue.
+		 */
+		free(nickname);
+		producer_unlock_socket(index);
+		// no other operations are allowed.
+		return;
+	}
+	bool error = false;
+	// iterating all messages
+	for (int i = 0; i < row_count && !error; i++) {
+		// preparing message
+		strcpy(reply.hdr.sender, senders[i]);
+		reply.data.hdr.len = ((unsigned int) strlen(messages[i]))
+				+ (unsigned int) sizeof(char);
+		reply.data.buf = malloc(reply.data.hdr.len);
+		strcpy(reply.data.buf, messages[i]);
+		reply.hdr.op = (is_files[i] == true) ? FILE_MESSAGE : TXT_MESSAGE;
+
+		// sending message
+		if (sendRequest(sockets[index], &reply) <= 0) {
+			log_error("Cannot send mesaage to user!");
+			error = true;
+		}
+
+		// if file
+		if (is_files[i] == true) {
+			// sending file
+			log_fatal("NOT IMPLEMENTED YET");
+		}
+
+		// message is sent, confirm the read
+		userman_set_msg_status(ids[i], true);
+
+		// free message buffer
+		free(reply.data.buf);
+
+		// free used indexes
+		free(messages[i]);
+		free(senders[i]);
+	}
+
+	// free
+	free(senders);
+	free(messages);
+	free(ids);
+	free(is_files);
+	free(nickname);
+
+	// release the socket
+	producer_unlock_socket(index);
 }
 
 void worker_run(amqp_message_t message) {
@@ -577,8 +628,9 @@ void worker_run(amqp_message_t message) {
 	int msg_type = udata[0];
 
 	if (msg_type == SERVER_QUEUE_MESSAGE_WRITE_REQ) {
+		log_error("Received write socket...");
 		// unlock sockets
-		producer_disconnect_host(index);
+		worker_send_live_message(index);
 		return;
 	}
 
@@ -601,7 +653,7 @@ void worker_run(amqp_message_t message) {
 		 *
 		 *
 		 */
-		// try to recover from session
+// try to recover from session
 		char *nickname = NULL;
 		log_debug("Try to retrieve nickname from session with socket index=%d",
 				index);
@@ -618,13 +670,13 @@ void worker_run(amqp_message_t message) {
 			worker_disconnect_user(index, &msg);
 		}
 
-		// no other operation are possible on socket.
+// no other operation are possible on socket.
 		return;
 	}
 
 	bool c_check = check_connection(index, &msg);
 	if (c_check == false) {
-		// connection cannot be established.
+// connection cannot be established.
 		return;
 	}
 
@@ -637,19 +689,19 @@ void worker_run(amqp_message_t message) {
 
 	switch (ra_ret) {
 	case -1:
-		// fatal problem, disconnect
+// fatal problem, disconnect
 		worker_disconnect_user(index, &msg);
 		break;
 	case 0:
-		// success, release the socket
+// success, release the socket
 		producer_unlock_socket(index);
-		// no other operation are possible on socket.
+// no other operation are possible on socket.
 		break;
 	case 1:
-		// user is already disconnect or socket is already released
+// user is already disconnect or socket is already released
 		break;
 	case 2:
-		// connection must be closed, but user is not registered
+// connection must be closed, but user is not registered
 		producer_disconnect_host(index);
 		break;
 	default:

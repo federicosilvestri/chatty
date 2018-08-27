@@ -173,7 +173,7 @@ static bool checkandget_arguments(int argc, char *argv[], int* log_level) {
 
 		// get the log level
 		*log_level = atoi(argv[4]);
-		if (*log_level < 1 || *log_level > 5) {
+		if (*log_level < 1 || *log_level > 7) {
 			usage(argv[0]);
 			return false;
 		}

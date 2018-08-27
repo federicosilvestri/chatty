@@ -370,7 +370,6 @@ static inline int run_init_socket_fds() {
 	FD_ZERO(&write_fds);
 
 	FD_SET(listen_socket_fd, &read_fds);
-	FD_SET(listen_socket_fd, &write_fds);
 
 	int max_sd = listen_socket_fd;
 
@@ -418,8 +417,14 @@ static inline bool run_manage_new_conn() {
 }
 
 static inline void run_manage_conn() {
+	// locking the entire array
+
 	for (int i = 0; i < producer_max_connections; i++) {
 		int sd = sockets[i];
+		if (sockets[i] <= 0 || sockets_block[i] == true) {
+			continue;
+		}
+
 		// check if we need to publish something or not
 		bool publish = false;
 		// message to send
@@ -437,7 +442,7 @@ static inline void run_manage_conn() {
 			 */
 			udata[0] = SERVER_QUEUE_MESSAGE_WRITE_REQ;
 			publish = true;
-			log_warn("Here we want dataaaaaa!"); // to remove
+			log_warn("Detected data on socket %d", sockets[i]); // to remove
 		}
 
 		if (publish == true) {

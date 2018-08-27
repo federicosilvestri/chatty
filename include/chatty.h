@@ -14,7 +14,7 @@
 typedef int make_iso_compilers_happy;
 
 #ifndef STD_LOG_LEVEL
-#define STD_LOG_LEVEL 7
+#define STD_LOG_LEVEL 1
 #endif
 
 #include <stdbool.h>

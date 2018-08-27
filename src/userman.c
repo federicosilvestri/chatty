@@ -87,8 +87,12 @@ static const char message_add_query[] =
 		"INSERT INTO messages(sender, receiver, timestamp, body, is_file, read) "
 				"VALUES ('%s', '%s', time('now'), '%s', '%d', '%d') ";
 
-static const char message_history_get[] = "SELECT body, is_file FROM messages "
-		"WHERE receiver = '%s' ORDER BY ID DESC LIMIT %d";
+static const char message_get_query[] =
+		"SELECT id, is_file, body, sender FROM messages "
+				"WHERE receiver = '%s' AND read LIKE '%c' ORDER BY ID DESC LIMIT %d";
+
+static const char message_set_status_query[] = "UPDATE messages SET read = '%d'"
+		" WHERE id = '%d'";
 
 /**
  * External configuration struct from config
@@ -527,11 +531,14 @@ bool is_file) {
 	return true;
 }
 
-int userman_get_prev_msgs(char *nickname, char ***list, bool **is_files, int limit) {
+int userman_get_msgs(char *nickname, char ***list, char ***senders, int **ids,
+		bool **is_files,
+		unsigned short int read_m, int limit) {
 	// query building
 	char *sql = NULL;
-	size_t sql_size = sizeof(message_history_get);
+	size_t sql_size = sizeof(message_get_query);
 	sql_size += sizeof(char) * (strlen(nickname) + 1);
+	sql_size += sizeof(char) * 1; // read or unread value
 	sql_size += sizeof(char) * 8; // max size of limit number
 
 	sql = calloc(sizeof(char), sql_size);
@@ -541,7 +548,24 @@ int userman_get_prev_msgs(char *nickname, char ***list, bool **is_files, int lim
 		return -1;
 	}
 
-	sprintf(sql, message_history_get, nickname, limit);
+	char read_v;
+	switch (read_m) {
+	case USERMAN_GET_MSGS_ALL:
+		read_v = '%';
+		break;
+	case USERMAN_GET_MSGS_READ:
+		read_v = '1';
+		break;
+	case USERMAN_GET_MSGS_UNREAD:
+		read_v = '0';
+		break;
+	default:
+		log_fatal("Bad read parameters passed to function!");
+		free(sql);
+		break;
+	}
+
+	sprintf(sql, message_get_query, nickname, read_v, limit);
 
 	sqlite3_stmt *stmt = NULL;
 	int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
@@ -556,6 +580,14 @@ int userman_get_prev_msgs(char *nickname, char ***list, bool **is_files, int lim
 	*list = calloc(sizeof(char**), sizeof(char**));
 	*is_files = calloc(sizeof(bool), sizeof(bool));
 
+	if (senders != NULL) {
+		*senders = calloc(sizeof(char**), sizeof(char**));
+	}
+
+	if (ids != NULL) {
+		*ids = calloc(sizeof(int), sizeof(int));
+	}
+
 	while (rc != SQLITE_DONE && rc != SQLITE_OK) {
 		int colCount = sqlite3_column_count(stmt);
 
@@ -563,26 +595,42 @@ int userman_get_prev_msgs(char *nickname, char ***list, bool **is_files, int lim
 			int type = sqlite3_column_type(stmt, colIndex);
 
 			if (type == SQLITE_TEXT) {
-				const char *body = (char*) sqlite3_column_text(stmt, colIndex);
-				if (body == NULL) {
+				const char *str_v = (char*) sqlite3_column_text(stmt, colIndex);
+
+				if (str_v == NULL) {
 					log_fatal("Cannot retrieve field from SQLITE.");
 					return -1;
 				}
 
-				(*list)[row_count] = malloc(sizeof(char) * (strlen(body) + 1));
-				strcpy((*list)[row_count], body);
+				if (colIndex == 2) {
+					(*list)[row_count] = malloc(
+							sizeof(char) * (strlen(str_v) + 1));
+					strcpy((*list)[row_count], str_v);
+				} else {
+					if (senders != NULL) {
+						(*senders)[row_count] = malloc(
+								sizeof(char) * (strlen(str_v) + 1));
+						strcpy((*senders)[row_count], str_v);
+					}
+				}
 			} else if (type == SQLITE_INTEGER) {
-				bool is_file = (bool) sqlite3_column_int(stmt, colIndex);
-				(*is_files)[row_count] = is_file;
+				int i_value = sqlite3_column_int(stmt, colIndex);
+
+				// check the index of query (very simple but rude)
+				if (colIndex == 0) {
+					// id field
+					if (ids != NULL) {
+						(*ids)[row_count] = i_value;
+					}
+				} else {
+					// read field
+					(*is_files)[row_count] = (bool) i_value;
+				}
 			} else {
 				log_fatal(
 						"Unexpected return value from sqlite during user selection");
-				free(sql);
-				free(is_files);
-				for (int j = 0; j < row_count; j++) {
-					free((*list)[j]);
-				}
-				free(*list);
+				userman_free_msgs(list, senders, row_count, ids, is_files);
+
 				return -1;
 			}
 		}
@@ -595,6 +643,14 @@ int userman_get_prev_msgs(char *nickname, char ***list, bool **is_files, int lim
 			*list = realloc(*list, sizeof(char**) * (size_t) (row_count + 1));
 			*is_files = realloc(*is_files,
 					sizeof(bool*) * (size_t) (row_count + 1));
+			if (ids != NULL) {
+				*ids = realloc(*ids, sizeof(int*) * (size_t) (row_count + 1));
+			}
+
+			if (senders != NULL) {
+				*senders = realloc(*senders,
+						sizeof(char **) * (size_t) (row_count + 1));
+			}
 		}
 	}
 
@@ -602,8 +658,85 @@ int userman_get_prev_msgs(char *nickname, char ***list, bool **is_files, int lim
 	rc = sqlite3_finalize(stmt);
 	free(sql);
 
+	// check if no columns are found, free pointers
+	if (row_count == 0) {
+		free(*is_files);
+		free(*list);
+
+		if (ids != NULL) {
+			free(*ids);
+		}
+
+		if (senders != NULL) {
+			free(*senders);
+		}
+	}
+
 	return row_count;
 
+}
+
+void userman_free_msgs(char ***list, char ***senders, int list_size, int **ids,
+		bool **is_files) {
+	if (list_size <= 0) {
+		// all memory was freed by userman_get_msgs function
+		return;
+	}
+
+	if (list != NULL) {
+		for (int i = 0; i < list_size; i++) {
+			free(*list[i]);
+		}
+
+		free(*list);
+
+	}
+
+	if (senders != NULL) {
+		for (int i = 0; i < list_size; i++) {
+			free(*senders[i]);
+		}
+
+		free(*list);
+	}
+
+	if (ids != NULL) {
+		free(*ids);
+	}
+
+	if (is_files != NULL) {
+		free(is_files);
+	}
+}
+
+bool userman_set_msg_status(int msgid, bool read) {
+	if (msgid < 0) {
+		return false;
+	}
+
+	bool ret = true;
+	size_t sql_size = sizeof(message_set_status_query);
+	sql_size += sizeof(char) * 10 * 2; // integer numbers.
+
+	char *sql = calloc(sizeof(char), sql_size);
+	sprintf(sql, message_set_status_query, read, msgid);
+
+	char *sql_errmsg;
+	int rc = sqlite3_exec(db, sql, NULL, 0, &sql_errmsg);
+
+	if (rc != SQLITE_OK) {
+		log_fatal("Programming error, query execution failed: %s, %s",
+				sql_errmsg, sqlite3_errmsg(db));
+
+		// cleanup error
+		sqlite3_free(sql_errmsg);
+		ret = false;
+	}
+
+	// cleanup query
+	free(sql);
+
+	return ret;
 }
 
 void userman_destroy() {
