@@ -29,6 +29,7 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/signal.h>
+#include <sys/stat.h>
 #include <amqp.h>
 #include <amqp_tcp_socket.h>
 #include <sqlite3.h>
@@ -94,6 +95,9 @@ static const char message_get_query[] =
 static const char message_set_status_query[] = "UPDATE messages SET read = '%d'"
 		" WHERE id = '%d'";
 
+static const char file_exists_query[] = "SELECT EXISTS(SELECT 1 FROM messages "
+		"WHERE receiver='%s' AND body = '%s' AND is_file = '1')";
+
 /**
  * External configuration struct from config
  */
@@ -103,6 +107,17 @@ extern config_t server_conf;
  * Database pathname
  */
 static const char *db_pathname;
+
+/**
+ * File directory path.
+ */
+static const char *filedir_path;
+
+/**
+ * Mutex used in some cases
+ * during writing files on datastore.
+ */
+static pthread_mutex_t filedir_mutex;
 
 /**
  * Database handler
@@ -164,6 +179,57 @@ static int simple_value_sanitizer(char **str) {
 	return (int) rep;
 }
 
+/**
+ * This function isolates the file name from path.
+ * For example /etc/cassandra/conf.yaml returns conf.yaml
+ * @param str the string to isolate
+ */
+static char* isolate_filename(char *str) {
+	if (str == NULL || strlen(str) <= 0) {
+		return NULL;
+	}
+
+	char *p = NULL;
+	int i;
+	for (i = (int) strlen(str) - 1; i > 0; i--) {
+		if (str[i] == '/') {
+			p = &str[i + 1];
+			break;
+		}
+	}
+
+	if (p == NULL) {
+		return strdup(str);
+	}
+
+	size_t adj_size = sizeof(char)
+			* (((size_t) strlen(str)) - (size_t) (i) + 2);
+	char *adj = calloc(sizeof(char), adj_size);
+
+	strcpy(adj, p);
+	return adj;
+}
+
+/**
+ * Returns the file path for a file.
+ * @param str the name of the file
+ * @return the pointer (to be freed) of string
+ */
+static char *get_filepath(char *filename) {
+	size_t string_size = sizeof(char)
+			* (strlen(filedir_path) + strlen(filename) + 3);
+	char *s_file_pathname = calloc(sizeof(char), string_size);
+	strcpy(s_file_pathname, filedir_path);
+
+	// concat string filename
+	if (filedir_path[strlen(filedir_path)] != '/') {
+		strcat(s_file_pathname, "/");
+	}
+	strcat(s_file_pathname, filename);
+
+	return s_file_pathname;
+}
+
 static bool userman_create_db() {
 	// creating table
 	char *err_msg = NULL;
@@ -220,6 +286,40 @@ bool userman_init() {
 		}
 	}
 
+	// Get file directory
+	if (config_lookup_string(&server_conf, "DirName",
+			&filedir_path) == CONFIG_FALSE) {
+		log_fatal("Cannot retrieve DirName configuration param!");
+		return false;
+	}
+
+	if (strlen(filedir_path) <= 0) {
+		log_fatal("DirName parameter is not valid!");
+		return false;
+	}
+
+	// temporary struct for directory checking
+	struct stat stat_buffer;
+	if (stat(filedir_path, &stat_buffer) != 0) {
+		// cannot retrieve information
+		log_fatal("Cannot retrieve information about DirName=%s directory!",
+				filedir_path);
+		return false;
+	}
+
+	if (S_ISDIR(stat_buffer.st_mode) == 0) {
+		log_fatal("DirName=%s is not a directory!");
+		return false;
+	}
+
+	if (access(filedir_path, W_OK) != 0) {
+		log_fatal("DirName=%s is not writable!");
+		return false;
+	}
+
+	// init mutex for datastore
+	check_mutex_lu_call(pthread_mutex_init(&filedir_mutex, NULL));
+
 	return true;
 }
 
@@ -248,6 +348,7 @@ bool userman_user_exists(char *nickname) {
 				ret_value = sqlite3_column_int(stmt, colIndex);
 			} else {
 				log_fatal("Unexpected response from query!");
+				free(sql_query);
 				exit(1);
 			}
 		}
@@ -332,7 +433,7 @@ bool userman_delete_user(char *nickname) {
 	return true;
 }
 
-size_t userman_get_users(char option, char **list) {
+int userman_get_users(char option, char **list) {
 	// query composition (binding)
 	char *sql_ext = NULL;
 
@@ -369,17 +470,24 @@ size_t userman_get_users(char option, char **list) {
 	rc = sqlite3_step(stmt);
 	*list = calloc(sizeof(char), __USERLIST_SIZE(1));
 	size_t list_size = __USERLIST_SIZE(1);
+	bool stop_err = false;
 
-	while (rc != SQLITE_DONE && rc != SQLITE_OK) {
+	while (rc != SQLITE_DONE && rc != SQLITE_OK && !stop_err) {
 		row_count++;
 		int colCount = sqlite3_column_count(stmt);
 
-		for (int colIndex = 0; colIndex < colCount; colIndex++) {
+		for (int colIndex = 0; colIndex < colCount && !stop_err; colIndex++) {
 			int type = sqlite3_column_type(stmt, colIndex);
 
 			if (type == SQLITE_TEXT) {
-				const unsigned char *nickname = sqlite3_column_text(stmt,
+				const char *nickname = (char*) sqlite3_column_text(stmt,
 						colIndex);
+
+				if (strlen(nickname) <= 0) {
+					log_error(
+							"Found null nickname in the database. Is database corrupted?");
+					stop_err = true;
+				}
 
 				// check if memory is needed
 				if (list_size < __USERLIST_SIZE(row_count)) {
@@ -390,7 +498,7 @@ size_t userman_get_users(char option, char **list) {
 
 					if (*list == NULL) {
 						log_fatal("OUT OF MEMORY");
-						exit(1);
+						stop_err = true;
 					}
 
 				}
@@ -404,7 +512,7 @@ size_t userman_get_users(char option, char **list) {
 			} else {
 				log_fatal(
 						"Unexpected return value from sqlite during user selection");
-				return 0;
+				stop_err = true;
 			}
 		}
 
@@ -415,7 +523,7 @@ size_t userman_get_users(char option, char **list) {
 	rc = sqlite3_finalize(stmt);
 	free(sql_ext);
 
-	return list_size;
+	return (stop_err == true) ? 0 : (int) list_size;
 }
 
 bool userman_set_user_status(char *nickname, bool status) {
@@ -494,6 +602,20 @@ bool is_file) {
 
 	simple_value_sanitizer(&body_san);
 
+	if (is_file == true) {
+		// extract file name
+		char *isolated = isolate_filename(body_san);
+
+		if (strcmp(isolated, body_san) == 0) {
+			// no problem
+			free(isolated);
+		} else {
+			char *t = body_san;
+			body_san = isolated;
+			free(t);
+		}
+	}
+
 	// query composition
 	size_t query_size = sizeof(message_add_query); // standard query template
 	query_size += sizeof(char) * (strlen(sender) + 1); // sender
@@ -531,9 +653,56 @@ bool is_file) {
 	return true;
 }
 
+bool userman_add_broadcast_msg(char *nickname, bool is_file, char *body) {
+	if (nickname == NULL || body == NULL) {
+		return false;
+	}
+
+	/*
+	 * Simple algorithm, add a message for all users.
+	 */
+
+	// first retrieve user list
+	char *nicknames = NULL;
+	int users_n = (int) userman_get_users(USERMAN_GET_ALL, &nicknames);
+
+	if (users_n < 0) {
+		free(nicknames);
+		log_fatal("Cannot continue due to previous error.");
+		return false;
+	}
+
+	// for each user, send message
+	bool stop_error = false;
+	users_n /= MAX_NAME_LENGTH + 1;
+	for (int i = 0, p = 0; i < users_n && !stop_error;
+			i++, p += MAX_NAME_LENGTH + 1) {
+		char *user_nick = &nicknames[p];
+
+		log_trace("nickname=%s", user_nick);
+		if (strcmp(user_nick, nickname) == 0) {
+			// do not send message to itself
+			continue;
+		}
+
+		// add message to user
+		bool add_ok = userman_add_message(nickname, user_nick, false, body,
+				is_file);
+
+		if (!add_ok) {
+			log_fatal("Cannot add message to user!");
+			stop_error = true;
+		}
+	}
+
+	// free memory
+	free(nicknames);
+
+	return !stop_error;
+}
+
 int userman_get_msgs(char *nickname, char ***list, char ***senders, int **ids,
-		bool **is_files,
-		unsigned short int read_m, int limit) {
+bool **is_files, unsigned short int read_m, int limit) {
 	// query building
 	char *sql = NULL;
 	size_t sql_size = sizeof(message_get_query);
@@ -548,7 +717,7 @@ int userman_get_msgs(char *nickname, char ***list, char ***senders, int **ids,
 		return -1;
 	}
 
-	char read_v;
+	char read_v = '0';
 	switch (read_m) {
 	case USERMAN_GET_MSGS_ALL:
 		read_v = '%';
@@ -677,7 +846,7 @@ int userman_get_msgs(char *nickname, char ***list, char ***senders, int **ids,
 }
 
 void userman_free_msgs(char ***list, char ***senders, int list_size, int **ids,
-		bool **is_files) {
+bool **is_files) {
 	if (list_size <= 0) {
 		// all memory was freed by userman_get_msgs function
 		return;
@@ -739,8 +908,188 @@ bool userman_set_msg_status(int msgid, bool read) {
 	return ret;
 }
 
+bool userman_store_file(char *ufilename, char *buffer, unsigned int bufflen) {
+	if (ufilename == NULL || buffer == NULL || bufflen == 0) {
+		return false;
+	}
+
+	if (strlen(ufilename) <= 0) {
+		return false;
+	}
+
+	char *filename = isolate_filename(ufilename);
+	char *s_file_pathname = get_filepath(filename);
+	free(filename);
+
+	log_debug("Writing filepath=%s", s_file_pathname);
+
+	// do we need to touch file?
+
+	// check if file already exists
+	if (access(s_file_pathname, F_OK) == 0) {
+		log_warn("File already exists! Overwriting...");
+	}
+
+	/*
+	 * We need to open a file for writing
+	 * and write the file.
+	 */
+
+	// LOCK the write to this thread
+	check_mutex_lu_call(pthread_mutex_lock(&filedir_mutex));
+
+	bool write_error = false;
+	FILE *s_file_handle = NULL;
+	s_file_handle = fopen(s_file_pathname, "wb");
+
+	if (s_file_handle == NULL) {
+		log_fatal("Cannot open file for writing... error=%s", strerror(errno));
+		write_error = true;
+	} else {
+		size_t write_size = fwrite(buffer, sizeof(char), bufflen,
+				s_file_handle);
+
+		if (write_size < bufflen) {
+			log_error("Cannot write the received file, error=%s",
+					strerror(errno));
+			write_error = true;
+		}
+
+		fclose(s_file_handle);
+	}
+
+	// UNLOCK the write
+	check_mutex_lu_call(pthread_mutex_unlock(&filedir_mutex));
+
+	// free memory
+	free(s_file_pathname);
+
+	return !write_error;
+}
+
+bool userman_file_exists(char *filename, char *nickname) {
+	if (filename == NULL || strlen(filename) <= 0) {
+		return false;
+	}
+
+	if (nickname == NULL || strlen(nickname) <= 0) {
+		return false;
+	}
+
+	// compose query
+	size_t sql_size = sizeof(file_exists_query);
+	sql_size += sizeof(char) * ((size_t) (strlen(nickname)) + 1);
+	sql_size += sizeof(char) * ((size_t) (strlen(filename)) + 1);
+
+	char *sql_query = calloc(sizeof(char), sql_size);
+	sprintf(sql_query, file_exists_query, nickname, filename);
+
+	sqlite3_stmt *stmt = NULL;
+	int rc = sqlite3_prepare_v2(db, sql_query, -1, &stmt, NULL);
+	if (rc != SQLITE_OK) {
+		log_fatal("Cannot prepare v2 statement!, %s", sqlite3_errmsg(db));
+		return true; // return a sane value
+	}
+
+	rc = sqlite3_step(stmt);
+	int ret_value = 1;
+
+	while (rc != SQLITE_DONE && rc != SQLITE_OK) {
+		int colCount = sqlite3_column_count(stmt);
+		for (int colIndex = 0; colIndex < colCount; colIndex++) {
+			int type = sqlite3_column_type(stmt, colIndex);
+
+			if (type == SQLITE_INTEGER) {
+				ret_value = sqlite3_column_int(stmt, colIndex);
+			} else {
+				log_fatal("Unexpected response from query!");
+				free(sql_query);
+				exit(1);
+			}
+		}
+
+		rc = sqlite3_step(stmt);
+	}
+
+	rc = sqlite3_finalize(stmt);
+	free(sql_query);
+
+	return (ret_value == 1);
+}
+
+bool userman_search_file(char *filename) {
+	if (filename == NULL || strlen(filename) <= 0) {
+		return false;
+	}
+
+	bool ret = false;
+	char *adj = isolate_filename(filename);
+	char *filepath = get_filepath(adj);
+	free(adj);
+
+	if (access(filepath, F_OK) == 0) {
+		ret = true;
+	}
+
+	free(filepath);
+
+	return ret;
+}
+
+size_t userman_get_file(char *filename, char **buffer) {
+	if (filename == NULL) {
+		return (size_t) -1;
+	}
+
+	// preparing the real path
+	char *adj = isolate_filename(filename);
+	char *real_path = get_filepath(adj);
+	free(adj);
+
+	struct stat st;
+	if (stat(real_path, &st) == -1) {
+		log_fatal("Cannot execute stat to file! error=%s", strerror(errno));
+		free(real_path);
+		return (size_t) -1;
+	}
+
+	size_t read_bytes;
+	FILE *file_handle = fopen(real_path, "rb");
+
+	if (file_handle == NULL) {
+		log_fatal("Cannot open file! error=%s", strerror(errno));
+		free(real_path);
+		return (size_t) -1;
+	}
+
+	*buffer = calloc(sizeof(char), (size_t) st.st_size);
+
+	if (*buffer == NULL) {
+		log_fatal("Out of memory!");
+		return (size_t) -1;
+	}
+
+	read_bytes = fread(*buffer, (size_t) st.st_size, sizeof(char), file_handle);
+
+	if (read_bytes < (size_t) st.st_size) {
+		log_fatal("fread hasn't read enough bytes! error=%s", strerror(errno));
+		free(*buffer);
+		free(real_path);
+
+		return (size_t) -1;
+	}
+
+	fclose(file_handle);
+	free(real_path);
+
+	return read_bytes;
+}
+
 void userman_destroy() {
 	if (sqlite3_close(db) != SQLITE_OK) {
 		log_warn("Cannot close database: %s", sqlite3_errmsg(db));
 	}
+
+	check_mutex_lu_call(pthread_mutex_unlock(&filedir_mutex));
+
 }

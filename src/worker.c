@@ -152,8 +152,12 @@ static void prepare_header(message_hdr_t *hdr) {
 static void prepare_data(message_data_t *msg, char *nickname) {
 	memset(msg, 0, sizeof(message_data_t));
 	msg->buf = NULL;
-	strncpy(msg->hdr.receiver, nickname, MAX_NAME_LENGTH);
 	msg->hdr.len = 0;
+	;
+
+	if (nickname != NULL) {
+		strncpy(msg->hdr.receiver, nickname, MAX_NAME_LENGTH);
+	}
 }
 
 static bool check_connection(int index, message_t *msg) {
@@ -199,7 +203,7 @@ static void worker_user_list(int index, message_t *msg, bool ack, char type) {
 	prepare_data(&reply, msg->hdr.sender);
 
 	reply.buf = NULL;
-	size_t list_size = userman_get_users(type, &reply.buf);
+	size_t list_size = (size_t) userman_get_users(type, &reply.buf);
 
 	if (list_size <= 0) {
 		log_fatal("Error during getting online users");
@@ -335,7 +339,6 @@ static void worker_posttxt(int index, message_t *msg) {
 
 	/*
 	 * sending message. first check if receiver user exists.
-	 * later check if is online, if is not online, store message as unread.
 	 */
 	bool stop = false;
 	if (strlen(msg->data.hdr.receiver) <= 0) {
@@ -347,9 +350,11 @@ static void worker_posttxt(int index, message_t *msg) {
 		// invalid buffer
 		log_warn("User has sent NULL message (buffer = NULL)");
 		reply_hdr.op = OP_FAIL;
+		stop = true;
 	} else if (strlen(msg->data.buf) > (unsigned int) max_message_size) {
 		log_warn("User has sent a too long message!");
 		reply_hdr.op = OP_MSG_TOOLONG;
+		stop = true;
 	} else {
 		// message should be OK, no SQL Injection test?...
 		bool exists = userman_user_exists(msg->data.hdr.receiver);
@@ -366,6 +371,47 @@ static void worker_posttxt(int index, message_t *msg) {
 		userman_add_message(msg->hdr.sender, msg->data.hdr.receiver, false,
 				msg->data.buf, false);
 		reply_hdr.op = OP_OK;
+	}
+
+	// an error is occurred, send header and stop.
+	int wh_size = sendHeader(sockets[index], &reply_hdr);
+
+	if (wh_size <= 0) {
+		log_error("Cannot send reply header to user! error:%s",
+				strerror(errno));
+	}
+}
+
+static void worker_posttxt_broadcast(int index, message_t *msg) {
+	// prepare the reply
+	message_hdr_t reply_hdr;
+	prepare_header(&reply_hdr);
+
+	log_debug(
+			"Message sender: %s Message Receiver: BROADCAST , Message body: %s",
+			msg->hdr.sender, msg->data.buf);
+
+	/*
+	 * sending broadcast message
+	 */
+	bool stop = false;
+	if (msg->data.buf == NULL) {
+		// invalid buffer
+		log_warn("User has sent NULL message (buffer = NULL)");
+		reply_hdr.op = OP_FAIL;
+		stop = true;
+	} else if (strlen(msg->data.buf) > (unsigned int) max_message_size) {
+		log_warn("User has sent a too long message!");
+		reply_hdr.op = OP_MSG_TOOLONG;
+		stop = true;
+	}
+
+	if (!stop) {
+		// send to DB.
+		bool send_status = userman_add_broadcast_msg(msg->hdr.sender, false,
+				msg->data.buf);
+
+		reply_hdr.op = (send_status == true) ? OP_OK : OP_FAIL;
 	}
 
 	// an error is occurred, send header and stop.
@@ -467,6 +513,256 @@ static void worker_get_prev_msgs(int index, message_t *msg) {
 	free(senders);
 }
 
+static void worker_postfile(int index, message_t *msg) {
+	// prepare the reply
+	message_hdr_t reply_hdr;
+	prepare_header(&reply_hdr);
+
+	log_debug(
+			"File Message sender: %s File Message Receiver: %s File Message body: %s",
+			msg->hdr.sender, msg->data.hdr.receiver, msg->data.buf);
+
+	// check if user exists
+	bool stop = false;
+	if (strlen(msg->data.hdr.receiver) <= 0) {
+		// invalid receiver
+		log_warn("User cannot send message to invalid user!");
+		reply_hdr.op = OP_NICK_UNKNOWN;
+		stop = true;
+	} else if (msg->data.buf == NULL) {
+		// invalid buffer
+		log_warn("User has sent NULL message (buffer = NULL)");
+		reply_hdr.op = OP_FAIL;
+		stop = true;
+	} else if (strlen(msg->data.buf) > (unsigned int) max_message_size) {
+		log_warn("User has sent a too long message!");
+		reply_hdr.op = OP_MSG_TOOLONG;
+		stop = true;
+	} else {
+		// message should be OK, no SQL Injection test?...
+		bool exists = userman_user_exists(msg->data.hdr.receiver);
+
+		if (exists == false) {
+			log_warn("User has sent a message to unknown user...");
+			reply_hdr.op = OP_NICK_UNKNOWN;
+			stop = true;
+		}
+	}
+
+	if (!stop) {
+		// receive file
+		message_data_t received_file;
+		prepare_data(&received_file, NULL);
+
+		int bytes_received = readData(sockets[index], &received_file);
+		unsigned int max_kb = (unsigned int) max_file_size * 1000;
+
+		if (bytes_received <= 0) {
+			log_error("Cannot receive bytes from client, is it disconnected!");
+			reply_hdr.op = OP_FAIL;
+		} else if (received_file.hdr.len == 0) {
+			log_error("Client has sent blank file!");
+			reply_hdr.op = OP_FAIL;
+		} else if (received_file.hdr.len > max_kb) {
+			log_warn("Client has sent a too long file!");
+			reply_hdr.op = OP_MSG_TOOLONG;
+		} else {
+			// add message to DB(only the filename and header infos)
+			if (userman_add_message(msg->hdr.sender, msg->data.hdr.receiver,
+			false, msg->data.buf, true) == false) {
+				reply_hdr.op = OP_FAIL;
+			} else {
+				// write file locally
+				if (userman_store_file(msg->data.buf, received_file.buf,
+						received_file.hdr.len) == false) {
+					reply_hdr.op = OP_FAIL;
+				}
+
+				reply_hdr.op = OP_OK;
+			}
+		}
+
+		// free received buffer
+		free(received_file.buf);
+	}
+
+	// an error is occurred, send header and stop.
+	int wh_size = sendHeader(sockets[index], &reply_hdr);
+
+	if (wh_size <= 0) {
+		log_error("Cannot send reply header to user! error:%s",
+				strerror(errno));
+	}
+}
+
+static void worker_getfile(int index, message_t *msg) {
+	// prepare the reply
+	message_hdr_t reply_hdr;
+	prepare_header(&reply_hdr);
+
+	// check the filename
+	char *filename = msg->data.buf;
+
+	bool err_stop = true;
+	if (filename == NULL) {
+		reply_hdr.op = OP_FAIL;
+	} else if (strlen(filename) <= 0) {
+		reply_hdr.op = OP_FAIL;
+	} else {
+		// check if file exists
+		if (userman_file_exists(filename, msg->hdr.sender) == false) {
+			log_error("User is searching for unavailable file!");
+			reply_hdr.op = OP_NO_SUCH_FILE;
+
+			if (userman_search_file(filename) == true) {
+				log_warn(
+						"User is searching for a file that exists, but is not delivered for itself");
+			}
+		} else {
+			reply_hdr.op = OP_OK;
+			err_stop = false;
+		}
+	}
+
+	// an error is occurred, send header and stop.
+	int wh_size = sendHeader(sockets[index], &reply_hdr);
+
+	if (wh_size <= 0) {
+		log_error("Cannot send reply header to user! error:%s",
+				strerror(errno));
+	}
+
+	if (err_stop == false) {
+		// send the message
+		message_data_t data;
+		prepare_data(&data, msg->hdr.sender);
+
+		/*
+		 * !!!!!!!!!!!!!!!!!!
+		 * !!!!!!!!!!!!!!!!!
+		 * !!!!!!!!!!!!!!!!
+		 * SET THE chi cazzo manda il messaggio, sennò il client può dare problemi!
+		 */
+
+		size_t file_size = userman_get_file(filename, &data.buf);
+
+		if (file_size <= 0) {
+			log_fatal("Cannot get file from userman!");
+			return;
+		}
+
+		data.hdr.len = (unsigned int) file_size;
+
+		if (sendData(sockets[index], &data) <= 0) {
+			log_error("Cannot send data to client!");
+		}
+
+		// free memory
+		free(data.buf);
+	}
+}
+
+static void worker_send_live_message(int index) {
+	char *nickname = NULL;
+
+	// retrieve nickname from socket file descriptor
+	producer_get_fd_nickname(index, &nickname);
+
+	if (nickname == NULL) {
+		// previously host hasn't sent the nickname, close connection
+		producer_unlock_socket(index);
+		return;
+	}
+
+	// preparing reply message
+	message_t reply;
+	prepare_header(&reply.hdr);
+	prepare_data(&reply.data, nickname);
+
+	// check for pending messages
+	char **messages = NULL;
+	char **senders = NULL;
+	int *ids = NULL;
+	bool *is_files = NULL;
+	int row_count;
+
+	row_count = userman_get_msgs(nickname, &messages, &senders, &ids, &is_files,
+	USERMAN_GET_MSGS_UNREAD, 100);
+
+	if (row_count < 0) {
+		/*
+		 * general failure of database, error is already printed
+		 */
+		reply.hdr.op = OP_FAIL;
+	} else if (row_count == 0) {
+		/*
+		 * no pending messages for this user,
+		 * memory is already freed by userman_get_msgs function.
+		 * release socket, in this way this thread will be free
+		 * to process other requests in the queue.
+		 */
+		free(nickname);
+		producer_unlock_socket(index);
+		// no other operations are allowed.
+		return;
+	}
+	bool error = false;
+	// iterating all messages
+	for (int i = 0; i < row_count && !error; i++) {
+		// preparing message
+		strcpy(reply.hdr.sender, senders[i]);
+		reply.data.hdr.len = ((unsigned int) strlen(messages[i]))
+				+ (unsigned int) sizeof(char);
+		reply.data.buf = malloc(reply.data.hdr.len);
+		strcpy(reply.data.buf, messages[i]);
+		reply.hdr.op = (is_files[i] == true) ? FILE_MESSAGE : TXT_MESSAGE;
+
+		// sending message
+		if (sendRequest(sockets[index], &reply) <= 0) {
+			log_error("Cannot send message to user!");
+			error = true;
+		}
+
+		// if file
+		if (is_files[i] == true) {
+			/*
+			 * Client will send a request
+			 * for file downloading.
+			 */
+			message_t file_msg;
+			if (readMsg(sockets[index], &file_msg) <= 0) {
+				log_error("Client has sent nothing...");
+			}
+
+			// call the function to send file
+			worker_getfile(index, &file_msg);
+
+			// free memory for file_msg
+			free(file_msg.data.buf);
+		}
+
+		// message is sent, confirm the read
+		userman_set_msg_status(ids[i], true);
+
+		// free message buffer
+		free(reply.data.buf);
+
+		// free used indexes
+		free(messages[i]);
+		free(senders[i]);
+	}
+
+	// free
+	free(senders);
+	free(messages);
+	free(ids);
+	free(is_files);
+	free(nickname);
+
+	// release the socket
+	producer_unlock_socket(index);
+}
+
 static int worker_action_router(int index, message_t *msg) {
 	int ret;
 
@@ -486,9 +782,16 @@ static int worker_action_router(int index, message_t *msg) {
 		ret = 0;
 		break;
 	case POSTTXTALL_OP:
+		worker_posttxt_broadcast(index, msg);
+		ret = 0;
+		break;
 	case POSTFILE_OP:
+		worker_postfile(index, msg);
+		ret = 0;
+		break;
 	case GETFILE_OP:
-		log_fatal("NOT IMPLEMENTED ACTIONS");
+		log_fatal("THIS REQUEST SHOULD NOT PERFORMED HERE!");
+		//worker_getfile(index, msg);
 		ret = -1;
 		break;
 	case GETPREVMSGS_OP:
@@ -523,95 +826,6 @@ static int worker_action_router(int index, message_t *msg) {
 	return ret;
 }
 
-static void worker_send_live_message(int index) {
-	char *nickname = NULL;
-
-	// retrieve nickname from socket file descriptor
-	producer_get_fd_nickname(index, &nickname);
-
-	if (nickname == NULL) {
-		// previously host hasn't sent the nickname, close connection
-		producer_unlock_socket(index);
-		return;
-	}
-
-	// preparing reply message
-	message_t reply;
-	prepare_header(&reply.hdr);
-	prepare_data(&reply.data, nickname);
-
-	// check for pending messages
-	char **messages = NULL;
-	char **senders = NULL;
-	int *ids = NULL;
-	bool *is_files = NULL;
-	int row_count;
-
-	row_count = userman_get_msgs(nickname, &messages, &senders, &ids, &is_files,
-			USERMAN_GET_MSGS_UNREAD, 100);
-
-	if (row_count < 0) {
-		/*
-		 * general failure of database, error is already printed
-		 */
-		reply.hdr.op = OP_FAIL;
-	} else if (row_count == 0) {
-		/*
-		 * no pending messages for this user,
-		 * memory is already freed by userman_get_msgs function.
-		 * release socket, in this way this thread will be free
-		 * to process other requests in the queue.
-		 */
-		free(nickname);
-		producer_unlock_socket(index);
-		// no other operations are allowed.
-		return;
-	}
-	bool error = false;
-	// iterating all messages
-	for (int i = 0; i < row_count && !error; i++) {
-		// preparing message
-		strcpy(reply.hdr.sender, senders[i]);
-		reply.data.hdr.len = ((unsigned int) strlen(messages[i]))
-				+ (unsigned int) sizeof(char);
-		reply.data.buf = malloc(reply.data.hdr.len);
-		strcpy(reply.data.buf, messages[i]);
-		reply.hdr.op = (is_files[i] == true) ? FILE_MESSAGE : TXT_MESSAGE;
-
-		// sending message
-		if (sendRequest(sockets[index], &reply) <= 0) {
-			log_error("Cannot send mesaage to user!");
-			error = true;
-		}
-
-		// if file
-		if (is_files[i] == true) {
-			// sending file
-			log_fatal("NOT IMPLEMENTED YET");
-		}
-
-		// message is sent, confirm the read
-		userman_set_msg_status(ids[i], true);
-
-		// free message buffer
-		free(reply.data.buf);
-
-		// free used indexes
-		free(messages[i]);
-		free(senders[i]);
-	}
-
-	// free
-	free(senders);
-	free(messages);
-	free(ids);
-	free(is_files);
-	free(nickname);
-
-	// release the socket
-	producer_unlock_socket(index);
-}
-
 void worker_run(amqp_message_t message) {
 	// check initialization
 	if (init == false) {
@@ -628,7 +842,7 @@ void worker_run(amqp_message_t message) {
 	int msg_type = udata[0];
 
 	if (msg_type == SERVER_QUEUE_MESSAGE_WRITE_REQ) {
-		log_error("Received write socket...");
+		// log_warn("Received write socket...");
 		// unlock sockets
 		worker_send_live_message(index);
 		return;
@@ -653,7 +867,7 @@ void worker_run(amqp_message_t message) {
 		 *
 		 *
 		 */
-// try to recover from session
+		// try to recover from session
 		char *nickname = NULL;
 		log_debug("Try to retrieve nickname from session with socket index=%d",
 				index);
@@ -670,13 +884,13 @@ void worker_run(amqp_message_t message) {
 			worker_disconnect_user(index, &msg);
 		}
 
-// no other operation are possible on socket.
+		// no other operation are possible on socket.
 		return;
 	}
 
 	bool c_check = check_connection(index, &msg);
 	if (c_check == false) {
-// connection cannot be established.
+		// connection cannot be established.
 		return;
 	}
 
@@ -689,19 +903,19 @@ void worker_run(amqp_message_t message) {
 
 	switch (ra_ret) {
 	case -1:
-// fatal problem, disconnect
+		// fatal problem, disconnect
 		worker_disconnect_user(index, &msg);
 		break;
 	case 0:
-// success, release the socket
+		// success, release the socket
 		producer_unlock_socket(index);
-// no other operation are possible on socket.
+		// no other operation are possible on socket.
 		break;
 	case 1:
-// user is already disconnect or socket is already released
+		// user is already disconnect or socket is already released
 		break;
 	case 2:
-// connection must be closed, but user is not registered
+		// connection must be closed, but user is not registered
 		producer_disconnect_host(index);
 		break;
 	default:

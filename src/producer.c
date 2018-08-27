@@ -397,7 +397,7 @@ static inline int run_init_socket_fds() {
 
 static inline bool run_manage_new_conn() {
 	if (FD_ISSET(listen_socket_fd, &read_fds)) {
-		int new_socket = accept(listen_socket_fd, NULL, 0);
+		int new_socket = accept(listen_socket_fd, NULL, NULL);
 
 		if (new_socket < 0) {
 			log_error("Error during creating new socket: %s", strerror(errno));
@@ -405,6 +405,12 @@ static inline bool run_manage_new_conn() {
 		}
 
 		log_info("New connection, socket fd is %d", new_socket);
+
+		// ignore standard I/O sockets
+		if (new_socket < 3) {
+			log_fatal("BAD SOCKET.");
+			exit(1);
+		}
 
 		// add new socket to array of sockets using last index
 		int av = get_av_sock_index();
@@ -442,7 +448,6 @@ static inline void run_manage_conn() {
 			 */
 			udata[0] = SERVER_QUEUE_MESSAGE_WRITE_REQ;
 			publish = true;
-			log_warn("Detected data on socket %d", sockets[i]); // to remove
 		}
 
 		if (publish == true) {

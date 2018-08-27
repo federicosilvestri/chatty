@@ -116,7 +116,7 @@ bool userman_delete_user(char* nickname);
  * @param list string a pointer to string (internally allocated and built)
  * @return -1 if any error occurs, else the number of the selected user.
  */
-size_t userman_get_users(char option, char** list);
+int userman_get_users(char option, char** list);
 
 /**
  * Update the status of user: online or offline.
@@ -147,6 +147,16 @@ bool userman_user_is_online(char *nickname);
  */
 bool userman_add_message(char *sender, char *receiver, bool read, char *body,
 bool is_file);
+
+/**
+ * Add a message for all users to database.
+ *
+ * @param nickname the nickname of sender
+ * @param is_file true if is file, false if not
+ * @param body the body of messae.
+ * @return true on success, false on error
+ */
+bool userman_add_broadcast_msg(char *nickname, bool is_file, char *body);
 
 /**
  * Get the messages of users.
@@ -180,6 +190,42 @@ void userman_free_msgs(char ***messages, char ***senders, int msg_size, int **id
  * @return true on success, false on error
  */
 bool userman_set_msg_status(int msgid, bool read);
+
+/**
+ * Store a file inside FileDir
+ *
+ * @param filename the name of the file
+ * @param buffer buffer of file
+ * @param bufflen the length of the buffer
+ * @return true on success, false on erro
+ */
+bool userman_store_file(char *filename, char *buffer, unsigned int bufflen);
+
+/**
+ * Checks if there are available file called filename for nickname user.
+ * @param filename the file name to check
+ * @param nickname the nickname to check for
+ * @return true if it exists, false if doesn't exist.
+ */
+bool userman_file_exists(char *filename, char *nickname);
+
+/**
+ * This function searches if there are files
+ * with name filename in the datastore.
+ *
+ * @param filename the filename to search
+ * @return true if exists, false if not exists
+ */
+bool userman_search_file(char *filename);
+
+/**
+ * Get a file from datastore.
+ *
+ * @param filename the file name you want to get.
+ * @param buf the buffer where you want function pushes data.
+ * @return -1 in case of error, in case of success the size of file
+ */
+size_t userman_get_file(char *filename, char **buf);
 
 /**
  * Deallocate and destroy userman.
