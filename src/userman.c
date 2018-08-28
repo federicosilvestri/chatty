@@ -379,6 +379,10 @@ int userman_add_user(char *nickname) {
 		return 3;
 	}
 
+	if (strlen(nickname) <= 0) {
+		return 2;
+	}
+
 	// prepare query
 	char *sql_query = calloc(sizeof(char),
 			sizeof(user_insert_query) + strlen(nickname) + 3);

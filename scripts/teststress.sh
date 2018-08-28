@@ -75,8 +75,8 @@ for ((i=0;i<16;++i)); do
     ./client -l $1 -k utente1 -R 5 -S connections.o:utente2 -p
     ./client -l $1 -k utente2 -R 5 -p -S chatty.o:utente1 
 
-    ./client -l $i -C utente1
-    ./client -l $i -C utente2
+    ./client -l $i -k utente1 -C utente1
+    ./client -l $i -k utente2 -C utente2
 
     wait
 done

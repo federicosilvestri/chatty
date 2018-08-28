@@ -353,6 +353,8 @@ int producer_get_fds_n_by_nickname(char *nickname) {
 	return fd_n;
 }
 
+// SELECT FUNCTION (you cannot call it outside, due to mutex lock)
+
 static inline int get_av_sock_index() {
 	int av = -1;
 
@@ -373,8 +375,6 @@ static inline int run_init_socket_fds() {
 
 	int max_sd = listen_socket_fd;
 
-	pthread_mutex_lock(&socket_mutex);
-
 	for (int i = 0; i < producer_max_connections; i++) {
 		int sd = sockets[i];
 
@@ -389,8 +389,6 @@ static inline int run_init_socket_fds() {
 			max_sd = sd;
 		}
 	}
-
-	pthread_mutex_unlock(&socket_mutex);
 
 	return max_sd;
 }
@@ -414,7 +412,14 @@ static inline bool run_manage_new_conn() {
 
 		// add new socket to array of sockets using last index
 		int av = get_av_sock_index();
-		sockets[av] = new_socket;
+
+		if (av != -1) {
+			sockets[av] = new_socket;
+		} else {
+			log_warn(
+					"Server overload, rejecting connections...(INCREASE CONNECTION NUMBER)");
+			close(new_socket);
+		}
 
 		return true;
 	}
@@ -452,7 +457,7 @@ static inline void run_manage_conn() {
 
 		if (publish == true) {
 			// lock the socket
-			producer_lock_socket(i);
+			sockets_block[i] = true;
 
 			// set the socket to process
 			udata[1] = i;
@@ -503,6 +508,7 @@ static void *producer_run() {
 	sigemptyset(&s_sigset);
 	sigaddset(&s_sigset, SIGINT);
 	sigaddset(&s_sigset, SIGQUIT);
+	sigaddset(&s_sigset, SIGTERM);
 	sigprocmask(SIG_BLOCK, &s_sigset, NULL);
 
 	// open channel to rabbit
@@ -514,8 +520,14 @@ static void *producer_run() {
 	}
 
 	while (producer_get_status() == SERVER_STATUS_RUNNING) {
+		// lock
+		check_mutex_lu_call(pthread_mutex_lock(&socket_mutex));
+
 		// initialize sets and get max fds
 		int max_sd = run_init_socket_fds();
+
+		// unlock to allow other threads to perform operations on socket management
+		check_mutex_lu_call(pthread_mutex_unlock(&socket_mutex));
 
 		/*
 		 * Select execution:
@@ -530,11 +542,14 @@ static void *producer_run() {
 			continue;
 		}
 
+		// lock for sockets management
+		check_mutex_lu_call(pthread_mutex_lock(&socket_mutex));
 		// check if there are new pending connections
 		if (!run_manage_new_conn()) {
 			// if no connection are discovered, manage the active
 			run_manage_conn();
 		}
+		check_mutex_lu_call(pthread_mutex_unlock(&socket_mutex));
 
 		/*
 		 *  end cycle, re-execute intialization and check,

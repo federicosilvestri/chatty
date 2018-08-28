@@ -58,7 +58,7 @@ CONFIG_TYPE_STRING, CONFIG_TYPE_STRING, CONFIG_TYPE_INT };
  * Configuration optional parameters default value
  */
 static const char *config_opt_params_default_value[] = { "chatty-exchange",
-		"chatty2018", "userman.db", "2" };
+		"chatty2018", "userman.db", "4" };
 
 /**
  * Size of array that contains required configuration

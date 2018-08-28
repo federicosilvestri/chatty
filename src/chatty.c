@@ -106,6 +106,7 @@ int main(int argc, char *argv[]) {
 
 		switch (action) {
 		case SIGINT:
+		case SIGTERM:
 		case SIGQUIT: {
 			if (server_status() != SERVER_STATUS_STOPPED) {
 				if (stop_send == 0) {

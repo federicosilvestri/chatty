@@ -29,7 +29,7 @@
 
 #include "log.h"
 
-static const int signals[] = { SIGPIPE, SIGINT, SIGUSR1, SIGQUIT };
+static const int signals[] = { SIGPIPE, SIGINT, SIGUSR1, SIGQUIT, SIGTERM };
 
 /**
  * Registered signal to register to system

@@ -13,7 +13,7 @@ FILE_DA_CONSEGNARE=Makefile chatty.c chatty.h message.h ops.h stats.h config.h \
 		   DATA/chatty.conf1 DATA/chatty.conf2 connections.h connections.c \
 		   amqp_utils.c log.c controller.c signal_manager.c \
 		   amqp_utils.h log.h controller.h signal_manager.h \
-		   producer.h producer.c consumer.c consumer.h worker.c \
+		   producer.h producer.c consumer.c consumer.h worker.c stats.c \
 		   worker.h userman.h userman.c
 # inserire il nome del tarball: es. NinoBixio
 TARNAME=FedericoSilvestri
@@ -59,7 +59,7 @@ TARGETS		= chatty        \
 
 
 # aggiungere qui i file oggetto da compilare
-OBJECTS		= log.o config.o signal_manager.o controller.o connections.o producer.o consumer.o amqp_utils.o worker.o userman.o
+OBJECTS		= log.o config.o signal_manager.o controller.o connections.o producer.o consumer.o amqp_utils.o worker.o userman.o stats.o
 
 # aggiungere qui gli altri include 
 INCLUDE_FILES   = chatty.h \

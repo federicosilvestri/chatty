@@ -131,7 +131,7 @@ int readHeader(long connfd, message_hdr_t *hdr) {
 		return -1;
 	}
 
-	return 1;
+	return (read_bytes == 0) ? 0 : 1;
 }
 
 /**
@@ -152,7 +152,7 @@ int readData(long connfd, message_data_t *data) {
 	memset(data, 0, sizeof(message_data_t));
 	int data_hdr_size = read(connfd, &data->hdr, sizeof(message_data_hdr_t));
 
-	if (data_hdr_size < 0) {
+	if (data_hdr_size <= 0) {
 		return data_hdr_size;
 	}
 
@@ -164,10 +164,11 @@ int readData(long connfd, message_data_t *data) {
 
 		int payload_s = readPayload(connfd, data->buf, data->hdr.len);
 
-		if (payload_s < 0) {
+		if (payload_s <= 0) {
 			free(data->buf);
-			return -1;
+			return payload_s;
 		}
+
 	} else {
 		data->buf = NULL;
 	}

@@ -37,6 +37,7 @@
 #include "consumer.h"
 #include "userman.h"
 #include "worker.h"
+#include "stats.h"
 
 /**
  * This is the internal status variable.
@@ -58,31 +59,41 @@ bool server_init() {
 		return false;
 	}
 
+	if (stat_init() == false) {
+		return false;
+	}
+
 	if (rabmq_init_params() == false) {
+		stat_destroy();
 		return false;
 	}
 
 	if (rabmq_declare_init() == false) {
+		stat_destroy();
 		return false;
 	}
 
 	if (userman_init() == false) {
+		stat_destroy();
 		userman_destroy();
 		return false;
 	}
 
 	if (producer_init() == false) {
+		stat_destroy();
 		userman_destroy();
 		return false;
 	}
 
 	if (worker_init() == false) {
+		stat_destroy();
 		userman_destroy();
 		producer_destroy();
 		return false;
 	}
 
 	if (consumer_init() == false) {
+		stat_destroy();
 		userman_destroy();
 		producer_destroy();
 		consumer_destroy();

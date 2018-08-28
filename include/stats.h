@@ -10,6 +10,7 @@
 
 #include <stdio.h>
 #include <time.h>
+#include <stdbool.h>
 
 /**
  * Statistics structure.
@@ -67,5 +68,30 @@ static inline int printStats(FILE *fout) {
 	fflush(fout);
 	return 0;
 }
+
+/**
+ * Initialize the statistics component
+ *
+ * @return true on success, false on error
+ */
+bool stat_init();
+
+/**
+ * Send a request for print statistics.
+ */
+void trigger_stats();
+
+void update_reg_users(int add, int remove);
+void update_on_users(int add, int remove);
+void update_dev_msgs(int add, int remove);
+void update_ndev_msgs(int add, int remove);
+void update_dev_file(int add, int remove);
+void update_ndev_file(int add, int remove);
+void update_errors(int add);
+
+/**
+ * Destroy the statistics component (it frees memory)
+ */
+void stat_destroy();
 
 #endif /* MEMBOX_STATS_ */

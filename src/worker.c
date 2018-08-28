@@ -164,8 +164,15 @@ static bool check_connection(int index, message_t *msg) {
 	// check the sender
 	if (strlen(msg->hdr.sender) == 0) {
 //		log_warn("Someone has sent anonymous message, rejecting");
-		// disconnect client brutally
-		producer_disconnect_host(index);
+//		// disconnect client brutally
+//
+//		log_warn("msg->hdr.op = %d", msg->hdr.op);
+//		log_warn("msg->hdr.op = %s", msg->hdr.sender);
+//		log_warn("msg->data.hdr.len = %s", msg->data.hdr.len);
+//		log_warn("msg->data.hdr.receiver = %s", msg->data.hdr.receiver);
+
+//		producer_disconnect_host(index);
+		producer_unlock_socket(index);
 		// no other operation are possible on socket.
 		return false;
 	}
@@ -612,6 +619,7 @@ static void worker_getfile(int index, message_t *msg) {
 						"User is searching for a file that exists, but is not delivered for itself");
 			}
 		} else {
+			// mark as read
 			reply_hdr.op = OP_OK;
 			err_stop = false;
 		}
@@ -774,9 +782,9 @@ static void worker_send_live_message(int index) {
 		reply.hdr.op = (is_files[i] == true) ? FILE_MESSAGE : TXT_MESSAGE;
 
 		// sending message
-		if (sendRequest(sockets[index], &reply) <= 0) {
-			log_error("Cannot send message to user!");
-			error = true;
+		if (sendRequest(sockets[index], &reply) < 0) {
+//			log_error("Cannot send message to user!");
+//			error = true;
 		}
 
 		// if file
@@ -808,8 +816,9 @@ static void worker_send_live_message(int index) {
 
 		// free message buffer
 		free(reply.data.buf);
+	}
 
-		// free used indexes
+	for (int i = 0; i < row_count; i++) {
 		free(messages[i]);
 		free(senders[i]);
 	}
