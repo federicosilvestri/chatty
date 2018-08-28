@@ -33,22 +33,6 @@ int openConnection(char* path, unsigned int ntimes, unsigned int secs) {
 	retries = (ntimes < MAX_RETRIES) ? ntimes : MAX_RETRIES;
 	sleeping = (secs < MAX_SLEEPING) ? secs : MAX_SLEEPING;
 
-	// first check if file exists
-	bool stop = false;
-	for (unsigned int i = 0; i < ntimes && stop == false; i++) {
-		if (access(path, F_OK) == -1) {
-			// file does not exist
-			sleep(sleeping);
-		} else {
-			stop = true;
-		}
-	}
-
-	if (stop == false) {
-		errno = ENOENT;
-		return -1;
-	}
-
 	// creating socket
 	int fd;
 	struct sockaddr_un socket_address;
@@ -83,6 +67,49 @@ int openConnection(char* path, unsigned int ntimes, unsigned int secs) {
 // -------- server side -----
 
 /**
+ * Read the payload of a message.
+ *
+ * @param connfd connection file descriptor
+ * @param buffer the buffer where write the payload
+ * @param length the length of payload to read
+ * @return -1 in case of error 1 in case of success
+ */
+int readPayload(long connfd, char *buffer, unsigned int length) {
+	char *tmp = buffer;
+
+	while (length > 0) {
+		int read_bytes = read(connfd, tmp, length);
+		if (read_bytes < 0)
+			return -1;
+		tmp += read_bytes;
+		length -= read_bytes;
+	}
+
+	return 1;
+}
+
+/**
+ * Write a payload of a message.
+ *
+ * @param connfd connection file descriptor
+ * @param buffer the buffer to write in the socket
+ * @param length the length of the buffer
+ * @return -1 in case of error, 1 in case of success
+ */
+int writePayload(long connfd, char *buffer, unsigned int length) {
+	while (length > 0) {
+		int w_bytes = write(connfd, buffer, length);
+		if (w_bytes < 0) {
+			return -1;
+		}
+		buffer += w_bytes;
+		length -= w_bytes;
+	}
+
+	return 1;
+}
+
+/**
  * @brief Legge l'header del messaggio
  *
  * @param connfd     descrittore della connessione
@@ -99,21 +126,12 @@ int readHeader(long connfd, message_hdr_t *hdr) {
 
 	memset(hdr, 0, sizeof(message_hdr_t));
 
-	ssize_t to_read = sizeof(message_hdr_t);
-	ssize_t read_size = 0;
-
-	while (to_read > 0) {
-		ssize_t read_bytes = read((int) connfd, hdr, (size_t) to_read);
-
-		if (read_bytes <= 0) {
-			return (int) read_bytes;
-		}
-
-		to_read -= read_bytes;
-		read_size += read_bytes;
+	int read_bytes = read(connfd, hdr, sizeof(message_hdr_t));
+	if (read_bytes < 0) {
+		return -1;
 	}
 
-	return (int) read_size;
+	return 1;
 }
 
 /**
@@ -131,37 +149,30 @@ int readData(long connfd, message_data_t *data) {
 		return -1;
 	}
 
-	long int data_hdr_size = 0;
-	long int data_payload_size = 0;
-
 	memset(data, 0, sizeof(message_data_t));
+	int data_hdr_size = read(connfd, &data->hdr, sizeof(message_data_hdr_t));
 
-	data_hdr_size = read((int) connfd, &data->hdr, sizeof(message_data_hdr_t));
-
-	if (data_hdr_size <= 0) {
-		return (int) data_hdr_size;
+	if (data_hdr_size < 0) {
+		return data_hdr_size;
 	}
 
 	// read payload, if necessary
-	if (data->hdr.len > 0) {
-		data->buf = calloc(sizeof(char), data->hdr.len);
-		unsigned int to_read = data->hdr.len;
+	if (data->hdr.len != 0) {
+		// prepare buffer
+		data->buf = malloc(data->hdr.len * sizeof(char));
+		memset(data->buf, 0, data->hdr.len * sizeof(char));
 
-		while (to_read > 0) {
-			long int t_size = read((int) connfd, data->buf, data->hdr.len);
+		int payload_s = readPayload(connfd, data->buf, data->hdr.len);
 
-			if (t_size < 0) {
-				// error
-				return (int) t_size;
-			}
-
-			data_payload_size += t_size;
-			to_read -= (unsigned int) t_size;
+		if (payload_s < 0) {
+			free(data->buf);
+			return -1;
 		}
-
+	} else {
+		data->buf = NULL;
 	}
 
-	return (int) (data_hdr_size + data_payload_size);
+	return 1;
 }
 
 /**
@@ -178,30 +189,24 @@ int readMsg(long connfd, message_t *msg) {
 		errno = ENOENT;
 		return -1;
 	}
-
-	int h_size = 0;
-	int p_size = 0;
-
 	// initialize message
 	memset(msg, 0, sizeof(message_t));
 
 	// read header
-	h_size = readHeader(connfd, &msg->hdr);
-	if (h_size <= 0) {
-		return h_size;
+	int h_s = readHeader(connfd, &msg->hdr);
+	if (h_s <= 0) {
+		return h_s;
 	}
 
 	// read data
-	p_size = readData(connfd, &msg->data);
+	int p_s = readData(connfd, &msg->data);
 
-	if (p_size <= 0) {
-		return p_size;
+	if (p_s <= 0) {
+		return p_s;
 	}
 
-	return (h_size + p_size);
+	return 1;
 }
-
-/* da completare da parte dello studente con altri metodi di interfaccia */
 
 // ------- client side ------
 /**
@@ -217,24 +222,21 @@ int sendRequest(long fd, message_t *msg) {
 		return -1;
 	}
 
-	int h_size = 0;
-	int p_size = 0;
-
 	// writing header of message
-	h_size = sendHeader((int) fd, &msg->hdr);
+	int h_s = sendHeader((int) fd, &msg->hdr);
 
-	if (h_size <= 0) {
-		return h_size;
+	if (h_s < 0) {
+		return -1;
 	}
 
 	// writing data
-	p_size = sendData(fd, &msg->data);
+	int p_s = sendData(fd, &msg->data);
 
-	if (p_size <= 0) {
-		return p_size;
+	if (p_s < 0) {
+		return -1;
 	}
 
-	return (h_size + p_size);
+	return 1;
 }
 
 /**
@@ -251,33 +253,19 @@ int sendData(long fd, message_data_t *msg) {
 	}
 
 	// read header, first
-	ssize_t dh_size = 0;
-	dh_size = write((int) fd, &msg->hdr, sizeof(message_data_hdr_t));
+	int d_status = write(fd, &msg->hdr, sizeof(message_data_hdr_t));
 
-	if (dh_size <= 0 || msg->hdr.len == 0) {
-		return (int) dh_size;
+	if (d_status < 0) {
+		return -1;
 	}
 
-	ssize_t payload_wrt_size = 0;
-
-	// write payload
-	ssize_t remain_size = msg->hdr.len;
-	while (remain_size > 0) {
-		ssize_t written_size = write((int) fd, msg->buf, (size_t) remain_size);
-
-		if (written_size < 0) {
-			return (int) written_size;
-		}
-
-		remain_size -= written_size;
-		payload_wrt_size += written_size;
+	// send payload
+	int p_status = writePayload(fd, msg->buf, msg->hdr.len);
+	if (p_status < 0) {
+		return -1;
 	}
 
-	if (payload_wrt_size <= 0) {
-		return (int) payload_wrt_size;
-	}
-
-	return (int) (dh_size + payload_wrt_size);
+	return 1;
 }
 
 /**
@@ -291,20 +279,12 @@ int sendHeader(int fd, message_hdr_t *hdr) {
 		return -1;
 	}
 
-	ssize_t to_write = sizeof(message_hdr_t);
-	ssize_t w_size = 0;
+	int w_size = write(fd, hdr, sizeof(message_hdr_t));
 
-	while (to_write > 0) {
-		ssize_t written_size = write(fd, hdr, (size_t) to_write);
-
-		if (written_size < 0) {
-			return (int) written_size;
-		}
-
-		w_size += written_size;
-		to_write -= written_size;
+	if (w_size < 0) {
+		return (int) w_size;
 	}
 
-	return (int) w_size;
+	return 1;
 }
 

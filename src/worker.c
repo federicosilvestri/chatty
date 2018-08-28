@@ -154,7 +154,6 @@ static void prepare_data(message_data_t *msg, char *nickname) {
 	memset(msg, 0, sizeof(message_data_t));
 	msg->buf = NULL;
 	msg->hdr.len = 0;
-	;
 
 	if (nickname != NULL) {
 		strncpy(msg->hdr.receiver, nickname, MAX_NAME_LENGTH);
@@ -491,12 +490,6 @@ static void worker_get_prev_msgs(int index, message_t *msg) {
 			log_fatal("Cannot send message!");
 		}
 
-		if (is_file_list[i] == true) {
-			// it's a file!
-			log_fatal("Function not implemented.");
-
-		}
-
 		// update message status
 		if (userman_set_msg_status(ids[i], true) == false) {
 			log_fatal("Cannot update status of message due to previous error.");
@@ -641,7 +634,8 @@ static void worker_getfile(int index, message_t *msg) {
 		 * !!!!!!!!!!!!!!!!!!
 		 * !!!!!!!!!!!!!!!!!
 		 * !!!!!!!!!!!!!!!!
-		 * SET THE chi cazzo manda il messaggio, sennò il client può dare problemi!
+		 * set the sender of the message, not?
+		 * POSSIBLE PROBLEM.
 		 */
 
 		size_t file_size = userman_get_file(filename, &data.buf);
@@ -689,9 +683,8 @@ static int worker_action_router(int index, message_t *msg) {
 		ret = 0;
 		break;
 	case GETFILE_OP:
-		log_fatal("THIS REQUEST SHOULD NOT PERFORMED HERE!");
-		//worker_getfile(index, msg);
-		ret = -1;
+		worker_getfile(index, msg);
+		ret = 0;
 		break;
 	case GETPREVMSGS_OP:
 		worker_get_prev_msgs(index, msg);

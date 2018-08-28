@@ -957,8 +957,6 @@ bool userman_store_file(char *ufilename, char *buffer, unsigned int bufflen) {
 			write_error = true;
 		}
 
-		log_warn("Writted %d Header len is %d", write_size, bufflen);
-
 		fclose(s_file_handle);
 	}
 

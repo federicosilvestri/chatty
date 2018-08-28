@@ -10,4 +10,10 @@ echo "Testing Project"
 echo "Making test1 $i"
 make test1
 
+pkill -QUIT chatty
+
+make test2
+
+pkill -QUIT chatty
+
 echo "TEST PROJECT PASSED"
