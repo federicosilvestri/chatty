@@ -5,8 +5,8 @@
  * Docenti: Prencipe, Torquati
  * 
  */
-#if !defined(MEMBOX_STATS_)
-#define MEMBOX_STATS_
+#ifndef CHATTY_STATS
+#define CHATTY_STATS
 
 #include <stdio.h>
 #include <time.h>
@@ -46,7 +46,15 @@ struct statistics {
 	unsigned long nerrors;
 };
 
-/* aggiungere qui altre funzioni di utilita' per le statistiche */
+extern struct statistics chattyStats;
+
+#define stats_update_reg_users(...) 	stats_update_value(__VA_ARGS__, &chattyStats.nusers)
+#define stats_update_on_users(...) 	stats_update_value(__VA_ARGS__, &chattyStats.nonline)
+#define stats_update_dev_msgs(...) 	stats_update_value(__VA_ARGS__, &chattyStats.ndelivered)
+#define stats_update_ndev_msgs(...) 	stats_update_value(__VA_ARGS__, &chattyStats.nnotdelivered)
+#define stats_update_dev_file(...) 	stats_update_value(__VA_ARGS__, &chattyStats.nfiledelivered)
+#define stats_update_ndev_file(...) 	stats_update_value(__VA_ARGS__, &chattyStats.nfilenotdelivered)
+#define stats_update_errors(...)		stats_update_value(__VA_ARGS__, 0,  &chattyStats.nerrors)
 
 /**
  * @function printStats
@@ -74,24 +82,26 @@ static inline int printStats(FILE *fout) {
  *
  * @return true on success, false on error
  */
-bool stat_init();
+bool stats_init();
 
 /**
  * Send a request for print statistics.
  */
-void trigger_stats();
+void stats_trigger();
 
-void update_reg_users(int add, int remove);
-void update_on_users(int add, int remove);
-void update_dev_msgs(int add, int remove);
-void update_ndev_msgs(int add, int remove);
-void update_dev_file(int add, int remove);
-void update_ndev_file(int add, int remove);
-void update_errors(int add);
+/**
+ * DO NOT USE this function if you don't know what you are doing.
+ * Update the values of statistics.
+ * @param add the value to add to stat
+ * @param remove the value to remove
+ * @param dest pointer to stat value
+ *
+ */
+void stats_update_value(unsigned long add, unsigned long remove, unsigned long *dest);
 
 /**
  * Destroy the statistics component (it frees memory)
  */
-void stat_destroy();
+void stats_destroy();
 
-#endif /* MEMBOX_STATS_ */
+#endif /* CHATTY_STATS */

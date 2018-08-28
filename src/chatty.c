@@ -35,11 +35,6 @@
 #include "chatty.h"
 
 /**
- * Variable to register statistics.
- */
-struct statistics chattyStats = { 0, 0, 0, 0, 0, 0, 0 };
-
-/**
  * Usage function.
  * @param progname name of program
  */
@@ -113,8 +108,9 @@ int main(int argc, char *argv[]) {
 					log_info("Received signal that stops server, quitting...");
 					server_stop();
 					stop_send += 1;
-				} else if (stop_send < 2){
-					log_warn("Keep calm! Server is stopping... If you want to kill now press again");
+				} else if (stop_send < 2) {
+					log_warn(
+							"Keep calm! Server is stopping... If you want to kill now press again");
 					stop_send += 1;
 				} else {
 					// brutally kill
@@ -125,12 +121,12 @@ int main(int argc, char *argv[]) {
 		}
 		case SIGUSR1:
 			log_info("Printing statistics...");
-			// print statistics
+			stats_trigger();
 			break;
 		default:
+			log_warn("Received signal that is not registered to signals table");
 			// wait other signal
 			break;
-
 		}
 	}
 

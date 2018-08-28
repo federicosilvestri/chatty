@@ -59,41 +59,41 @@ bool server_init() {
 		return false;
 	}
 
-	if (stat_init() == false) {
+	if (stats_init() == false) {
 		return false;
 	}
 
 	if (rabmq_init_params() == false) {
-		stat_destroy();
+		stats_destroy();
 		return false;
 	}
 
 	if (rabmq_declare_init() == false) {
-		stat_destroy();
+		stats_destroy();
 		return false;
 	}
 
 	if (userman_init() == false) {
-		stat_destroy();
+		stats_destroy();
 		userman_destroy();
 		return false;
 	}
 
 	if (producer_init() == false) {
-		stat_destroy();
+		stats_destroy();
 		userman_destroy();
 		return false;
 	}
 
 	if (worker_init() == false) {
-		stat_destroy();
+		stats_destroy();
 		userman_destroy();
 		producer_destroy();
 		return false;
 	}
 
 	if (consumer_init() == false) {
-		stat_destroy();
+		stats_destroy();
 		userman_destroy();
 		producer_destroy();
 		consumer_destroy();

@@ -509,6 +509,8 @@ static void *producer_run() {
 	sigaddset(&s_sigset, SIGINT);
 	sigaddset(&s_sigset, SIGQUIT);
 	sigaddset(&s_sigset, SIGTERM);
+	sigaddset(&s_sigset, SIGUSR1);
+	sigaddset(&s_sigset, SIGUSR2);
 	sigprocmask(SIG_BLOCK, &s_sigset, NULL);
 
 	// open channel to rabbit

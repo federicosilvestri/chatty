@@ -67,7 +67,6 @@ int server_status();
  * This function returns immediatly, because
  * it starts a thread to execute commands
  * in order.
- * @param force set true if you want to force the shutdown
  * @return true on success, false on error
  */
 bool server_stop();

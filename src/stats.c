@@ -49,7 +49,12 @@ static const char *stat_filename;
  */
 static pthread_mutex_t stat_mutex;
 
-bool stat_init() {
+/**
+ * Variable to register statistics.
+ */
+struct statistics chattyStats = { 0, 0, 0, 0, 0, 0, 0 };
+
+bool stats_init() {
 	bool initialized = false;
 	if (initialized) {
 		return false;
@@ -57,7 +62,8 @@ bool stat_init() {
 	initialized = true;
 
 	// get statistics filename
-	if (config_lookup_string(&server_conf, "StatFileName", &stat_filename) == CONFIG_FALSE) {
+	if (config_lookup_string(&server_conf, "StatFileName",
+			&stat_filename) == CONFIG_FALSE) {
 		log_fatal("Cannot get value for StatFileName!");
 		return false;
 	}
@@ -69,10 +75,17 @@ bool stat_init() {
 	}
 
 	// check if file dir is writable
-	if (access(dirname((char *)stat_filename), W_OK) != 0) {
-		log_fatal("Stat filename is not accessible with write privileges! file=%s", stat_filename);
+	char *dir = strdup(stat_filename);
+	dirname(dir);
+
+	if (access(dir, W_OK) != 0) {
+		log_fatal(
+				"Stat filename is not accessible with write privileges! file=%s",
+				stat_filename);
 		return false;
 	}
+
+	free(dir);
 
 	// initialize mutex
 	if (pthread_mutex_init(&stat_mutex, NULL) != 0) {
@@ -80,12 +93,11 @@ bool stat_init() {
 		return false;
 	}
 
-
 	return true;
 }
 
-
-void trigger_stats() {
+void stats_trigger() {
+	pthread_mutex_lock(&stat_mutex);
 	// open stat file
 	FILE *file_handle = fopen(stat_filename, "w");
 
@@ -99,20 +111,29 @@ void trigger_stats() {
 		log_error("Cannot write to statistics file, error=%s", strerror(errno));
 	}
 
+	pthread_mutex_unlock(&stat_mutex);
 	fclose(file_handle);
 
 	log_info("Statistics file=%s GENERATED", stat_filename);
 }
 
-//void update_reg_users(int add, int remove);
-//void update_on_users(int add, int remove);
-//void update_dev_msgs(int add, int remove);
-//void update_ndev_msgs(int add, int remove);
-//void update_dev_file(int add, int remove);
-//void update_ndev_file(int add, int remove);
-//void update_errors(int add);
 
-void stat_destroy() {
+void stats_update_value(unsigned long add, unsigned long remove, unsigned long *dest) {
+	pthread_mutex_lock(&stat_mutex);
+
+	*dest += add;
+
+	if (*dest < remove) {
+		*dest = 0;
+	} else {
+		*dest -= remove;
+	}
+
+	pthread_mutex_unlock(&stat_mutex);
+}
+
+
+void stats_destroy() {
 	// destroy the used mutex
 	pthread_mutex_destroy(&stat_mutex);
 }

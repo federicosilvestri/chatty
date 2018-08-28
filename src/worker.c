@@ -29,6 +29,7 @@
 
 #include "connections.h"
 #include "message.h"
+#include "stats.h"
 #include "ops.h"
 
 #include "log.h"
@@ -163,7 +164,7 @@ static void prepare_data(message_data_t *msg, char *nickname) {
 static bool check_connection(int index, message_t *msg) {
 	// check the sender
 	if (strlen(msg->hdr.sender) == 0) {
-//		log_warn("Someone has sent anonymous message, rejecting");
+		log_warn("Someone has sent anonymous message, rejecting");
 //		// disconnect client brutally
 //
 //		log_warn("msg->hdr.op = %d", msg->hdr.op);
@@ -238,14 +239,17 @@ static void worker_register_user(int index, message_t *msg) {
 	case 0:
 		hdr_reply.op = OP_OK;
 		log_info("User registered successfully");
+		stats_update_reg_users(1, 0);
 		break;
 	case 1:
 		hdr_reply.op = OP_NICK_ALREADY;
 		log_info("Cannot register user, nickname is already registered");
+		stats_update_errors(1);
 		break;
 	default:
 		log_error("User registration failed, return value: %d", reg_status);
 		hdr_reply.op = OP_FAIL;
+		stats_update_errors(1);
 		break;
 	}
 
@@ -267,10 +271,11 @@ static void worker_deregister_user(int index, message_t *msg) {
 	bool dereg_status = userman_delete_user(msg->hdr.sender);
 
 	if (dereg_status == true) {
-
+		stats_update_reg_users(0, 1);
 		hdr_reply.op = OP_OK;
 		log_info("User DEregistered successfully");
 	} else {
+		stats_update_errors(1);
 		log_error("User DEregistration failed, maybe user does not exist");
 		hdr_reply.op = OP_FAIL;
 	}
@@ -291,6 +296,7 @@ static inline void worker_disconnect_user(int index, message_t *msg) {
 		USERMAN_STATUS_OFFL) == false) {
 			log_fatal("Cannot set user offline due to previous errors!");
 		}
+
 	} else if (opened_sockets <= 0) {
 		log_fatal("Current user is %s, but opened sockets are %d.",
 				msg->hdr.sender, opened_sockets);
@@ -322,6 +328,7 @@ static inline void worker_connect_user(int index, message_t *msg) {
 			log_error("Cannot send reply to client!");
 		}
 
+		stats_update_on_users(1, 0);
 		// send user list
 		worker_user_list(index, msg, false, USERMAN_GET_ONL);
 	} else {
@@ -333,6 +340,7 @@ static inline void worker_connect_user(int index, message_t *msg) {
 		}
 
 		// done
+		stats_update_errors(1);
 	}
 }
 
@@ -347,21 +355,18 @@ static void worker_posttxt(int index, message_t *msg) {
 	/*
 	 * sending message. first check if receiver user exists.
 	 */
-	bool stop = false;
+	bool stop = true;
 	if (strlen(msg->data.hdr.receiver) <= 0) {
 		// invalid receiver
 		log_warn("User cannot send message to invalid user!");
 		reply_hdr.op = OP_NICK_UNKNOWN;
-		stop = true;
 	} else if (msg->data.buf == NULL) {
 		// invalid buffer
 		log_warn("User has sent NULL message (buffer = NULL)");
 		reply_hdr.op = OP_FAIL;
-		stop = true;
 	} else if (strlen(msg->data.buf) > (unsigned int) max_message_size) {
 		log_warn("User has sent a too long message!");
 		reply_hdr.op = OP_MSG_TOOLONG;
-		stop = true;
 	} else {
 		// message should be OK, no SQL Injection test?...
 		bool exists = userman_user_exists(msg->data.hdr.receiver);
@@ -369,8 +374,9 @@ static void worker_posttxt(int index, message_t *msg) {
 		if (exists == false) {
 			log_warn("User has sent a message to unknown user...");
 			reply_hdr.op = OP_NICK_UNKNOWN;
-			stop = true;
 		}
+
+		stop = false;
 	}
 
 	if (!stop) {
@@ -378,6 +384,9 @@ static void worker_posttxt(int index, message_t *msg) {
 		userman_add_message(msg->hdr.sender, msg->data.hdr.receiver, false,
 				msg->data.buf, false);
 		reply_hdr.op = OP_OK;
+		stats_update_ndev_msgs(1, 0);
+	} else {
+		stats_update_errors(1);
 	}
 
 	// an error is occurred, send header and stop.
@@ -431,7 +440,6 @@ static void worker_posttxt_broadcast(int index, message_t *msg) {
 }
 
 static void worker_get_prev_msgs(int index, message_t *msg) {
-	// send an ACK (i don't know why)
 	message_hdr_t ack_reply;
 	prepare_header(&ack_reply);
 
@@ -464,6 +472,7 @@ static void worker_get_prev_msgs(int index, message_t *msg) {
 
 	if (ack_reply.op == OP_FAIL) {
 		userman_free_msgs(&list, NULL, prev_msgs_n, NULL, &is_file_list);
+		stats_update_errors(1);
 		return;
 	}
 
@@ -502,6 +511,14 @@ static void worker_get_prev_msgs(int index, message_t *msg) {
 			log_fatal("Cannot update status of message due to previous error.");
 		}
 
+		if (reply.hdr.op == FILE_MESSAGE) {
+			stats_update_ndev_file(0, 1);
+			stats_update_dev_file(1, 0);
+		} else {
+			stats_update_ndev_msgs(0, 1);
+			stats_update_dev_msgs(1, 0);
+		}
+
 		// free memory
 		free(list[i]);
 		free(senders[i]);
@@ -524,21 +541,18 @@ static void worker_postfile(int index, message_t *msg) {
 			msg->hdr.sender, msg->data.hdr.receiver, msg->data.buf);
 
 	// check if user exists
-	bool stop = false;
+	bool stop = true;
 	if (strlen(msg->data.hdr.receiver) <= 0) {
 		// invalid receiver
 		log_warn("User cannot send message to invalid user!");
 		reply_hdr.op = OP_NICK_UNKNOWN;
-		stop = true;
 	} else if (msg->data.buf == NULL) {
 		// invalid buffer
 		log_warn("User has sent NULL message (buffer = NULL)");
 		reply_hdr.op = OP_FAIL;
-		stop = true;
 	} else if (strlen(msg->data.buf) > (unsigned int) max_message_size) {
 		log_warn("User has sent a too long message!");
 		reply_hdr.op = OP_MSG_TOOLONG;
-		stop = true;
 	} else {
 		// message should be OK, no SQL Injection test?...
 		bool exists = userman_user_exists(msg->data.hdr.receiver);
@@ -546,8 +560,9 @@ static void worker_postfile(int index, message_t *msg) {
 		if (exists == false) {
 			log_warn("User has sent a message to unknown user...");
 			reply_hdr.op = OP_NICK_UNKNOWN;
-			stop = true;
 		}
+
+		stop = false;
 	}
 
 	if (!stop) {
@@ -585,9 +600,17 @@ static void worker_postfile(int index, message_t *msg) {
 
 		// free received buffer
 		free(received_file.buf);
+
+		if (reply_hdr.op == OP_OK) {
+			stats_update_ndev_file(1,0);
+		} else {
+			stats_update_errors(1);
+		}
+	} else {
+		stats_update_errors(1);
 	}
 
-	// an error is occurred, send header and stop.
+	// send header
 	int wh_size = sendHeader(sockets[index], &reply_hdr);
 
 	if (wh_size <= 0) {
@@ -891,6 +914,8 @@ void worker_run(amqp_message_t message) {
 			free(nickname);
 			worker_disconnect_user(index, &msg);
 		}
+
+		stats_update_on_users(0, 1);
 
 		// no other operation are possible on socket.
 		return;
