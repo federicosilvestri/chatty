@@ -163,7 +163,7 @@ static void prepare_data(message_data_t *msg, char *nickname) {
 static bool check_connection(int index, message_t *msg) {
 	// check the sender
 	if (strlen(msg->hdr.sender) == 0) {
-		log_warn("Someone has sent anonymous message, rejecting");
+//		log_warn("Someone has sent anonymous message, rejecting");
 		// disconnect client brutally
 		producer_disconnect_host(index);
 		// no other operation are possible on socket.
@@ -549,7 +549,7 @@ static void worker_postfile(int index, message_t *msg) {
 		prepare_data(&received_file, NULL);
 
 		int bytes_received = readData(sockets[index], &received_file);
-		unsigned int max_kb = (unsigned int) max_file_size * 1000;
+		unsigned int max_kb = (unsigned int) max_file_size * 1024;
 
 		if (bytes_received <= 0) {
 			log_error("Cannot receive bytes from client, is it disconnected!");
