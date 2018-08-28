@@ -30,6 +30,8 @@
 #include <sys/time.h>
 #include <sys/signal.h>
 #include <sys/stat.h>
+#include <fcntl.h>
+#include <sys/mman.h>
 #include <amqp.h>
 #include <amqp_tcp_socket.h>
 #include <sqlite3.h>
@@ -949,11 +951,13 @@ bool userman_store_file(char *ufilename, char *buffer, unsigned int bufflen) {
 		size_t write_size = fwrite(buffer, sizeof(char), bufflen,
 				s_file_handle);
 
-		if (write_size < bufflen) {
+		if (write_size != bufflen) {
 			log_error("Cannot write the received file, error=%s",
 					strerror(errno));
 			write_error = true;
 		}
+
+		log_warn("Writted %d Header len is %d", write_size, bufflen);
 
 		fclose(s_file_handle);
 	}
@@ -1053,36 +1057,26 @@ size_t userman_get_file(char *filename, char **buffer) {
 		return (size_t) -1;
 	}
 
-	size_t read_bytes;
-	FILE *file_handle = fopen(real_path, "rb");
+	int file_fd = open(real_path, O_RDONLY);
 
-	if (file_handle == NULL) {
+	if (file_fd < 0) {
 		log_fatal("Cannot open file! error=%s", strerror(errno));
 		free(real_path);
 		return (size_t) -1;
+
 	}
 
-	*buffer = calloc(sizeof(char), (size_t) st.st_size);
+	*buffer = mmap(NULL, (size_t) st.st_size, PROT_READ, MAP_PRIVATE, file_fd, 0);
 
 	if (*buffer == NULL) {
-		log_fatal("Out of memory!");
+		log_fatal("Cannot map file to memory!");
 		return (size_t) -1;
 	}
 
-	read_bytes = fread(*buffer, (size_t) st.st_size, sizeof(char), file_handle);
-
-	if (read_bytes < (size_t) st.st_size) {
-		log_fatal("fread hasn't read enough bytes! error=%s", strerror(errno));
-		free(*buffer);
-		free(real_path);
-
-		return (size_t) -1;
-	}
-
-	fclose(file_handle);
+	close(file_fd);
 	free(real_path);
 
-	return read_bytes;
+	return (size_t) st.st_size;
 }
 
 void userman_destroy() {

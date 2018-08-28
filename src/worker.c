@@ -25,6 +25,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <libconfig.h>
+#include <sys/mman.h>
 
 #include "connections.h"
 #include "message.h"
@@ -611,9 +612,8 @@ static void worker_getfile(int index, message_t *msg) {
 	} else {
 		// check if file exists
 		if (userman_file_exists(filename, msg->hdr.sender) == false) {
-			log_error("User is searching for unavailable file!");
+			log_error("User is searching for unavailable file! = %s", filename);
 			reply_hdr.op = OP_NO_SUCH_FILE;
-
 			if (userman_search_file(filename) == true) {
 				log_warn(
 						"User is searching for a file that exists, but is not delivered for itself");
@@ -657,9 +657,72 @@ static void worker_getfile(int index, message_t *msg) {
 			log_error("Cannot send data to client!");
 		}
 
-		// free memory
-		free(data.buf);
+		// free memory map
+		munmap(data.buf, file_size);
 	}
+}
+
+static int worker_action_router(int index, message_t *msg) {
+	int ret;
+
+	log_trace("ACTION REQUESTED: %d", msg->hdr.op);
+
+	switch (msg->hdr.op) {
+	case REGISTER_OP:
+		worker_register_user(index, msg);
+		ret = 0;
+		break;
+	case CONNECT_OP:
+		worker_connect_user(index, msg);
+		ret = 0;
+		break;
+	case POSTTXT_OP:
+		worker_posttxt(index, msg);
+		ret = 0;
+		break;
+	case POSTTXTALL_OP:
+		worker_posttxt_broadcast(index, msg);
+		ret = 0;
+		break;
+	case POSTFILE_OP:
+		worker_postfile(index, msg);
+		ret = 0;
+		break;
+	case GETFILE_OP:
+		log_fatal("THIS REQUEST SHOULD NOT PERFORMED HERE!");
+		//worker_getfile(index, msg);
+		ret = -1;
+		break;
+	case GETPREVMSGS_OP:
+		worker_get_prev_msgs(index, msg);
+		ret = 0;
+		break;
+	case USRLIST_OP:
+		worker_user_list(index, msg, true, USERMAN_GET_ONL);
+		ret = 0;
+		break;
+	case UNREGISTER_OP:
+		worker_deregister_user(index, msg);
+		ret = 2;
+		break;
+	case DISCONNECT_OP:
+		worker_disconnect_user(index, msg);
+		ret = 1;
+		break;
+	case CREATEGROUP_OP:
+	case ADDGROUP_OP:
+	case DELGROUP_OP:
+// optional
+		log_fatal("OPTIONAL NOT IMPLEMENTED");
+		ret = -1;
+		break;
+	default:
+		log_error("Operation not recognized by server, bad protocol.");
+		ret = -1;
+		break;
+	}
+
+	return ret;
 }
 
 static void worker_send_live_message(int index) {
@@ -734,11 +797,17 @@ static void worker_send_live_message(int index) {
 				log_error("Client has sent nothing...");
 			}
 
-			// call the function to send file
-			worker_getfile(index, &file_msg);
+			if (file_msg.hdr.op != GETFILE_OP) {
+				worker_action_router(index, &file_msg);
+			} else {
+				// call the function to send file
+				worker_getfile(index, &file_msg);
+			}
 
 			// free memory for file_msg
-			free(file_msg.data.buf);
+			if (file_msg.data.buf != NULL) {
+				free(file_msg.data.buf);
+			}
 		}
 
 		// message is sent, confirm the read
@@ -761,69 +830,6 @@ static void worker_send_live_message(int index) {
 
 	// release the socket
 	producer_unlock_socket(index);
-}
-
-static int worker_action_router(int index, message_t *msg) {
-	int ret;
-
-	log_trace("ACTION REQUESTED: %d", msg->hdr.op);
-
-	switch (msg->hdr.op) {
-	case REGISTER_OP:
-		worker_register_user(index, msg);
-		ret = 0;
-		break;
-	case CONNECT_OP:
-		worker_connect_user(index, msg);
-		ret = 0;
-		break;
-	case POSTTXT_OP:
-		worker_posttxt(index, msg);
-		ret = 0;
-		break;
-	case POSTTXTALL_OP:
-		worker_posttxt_broadcast(index, msg);
-		ret = 0;
-		break;
-	case POSTFILE_OP:
-		worker_postfile(index, msg);
-		ret = 0;
-		break;
-	case GETFILE_OP:
-		log_fatal("THIS REQUEST SHOULD NOT PERFORMED HERE!");
-		//worker_getfile(index, msg);
-		ret = -1;
-		break;
-	case GETPREVMSGS_OP:
-		worker_get_prev_msgs(index, msg);
-		ret = 0;
-		break;
-	case USRLIST_OP:
-		worker_user_list(index, msg, true, USERMAN_GET_ONL);
-		ret = 0;
-		break;
-	case UNREGISTER_OP:
-		worker_deregister_user(index, msg);
-		ret = 2;
-		break;
-	case DISCONNECT_OP:
-		worker_disconnect_user(index, msg);
-		ret = 1;
-		break;
-	case CREATEGROUP_OP:
-	case ADDGROUP_OP:
-	case DELGROUP_OP:
-// optional
-		log_fatal("OPTIONAL NOT IMPLEMENTED");
-		ret = -1;
-		break;
-	default:
-		log_error("Operation not recognized by server, bad protocol.");
-		ret = -1;
-		break;
-	}
-
-	return ret;
 }
 
 void worker_run(amqp_message_t message) {
