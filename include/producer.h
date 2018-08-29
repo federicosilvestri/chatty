@@ -113,6 +113,11 @@ int producer_get_fd_by_nickname(char* nickname);
  */
 int producer_get_fds_n_by_nickname(char *nickname);
 
-int producer_get_fds_n();
+/**
+ * Get the current active user connections
+ *
+ * @return the number of current user connections
+ */
+unsigned int producer_get_fds_n();
 
 #endif /* PRODUCER_H */

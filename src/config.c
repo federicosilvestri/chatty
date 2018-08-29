@@ -21,6 +21,7 @@
 #include <stdbool.h>
 #include <errno.h>
 #include <libconfig.h>
+#include <unistd.h>
 #include <string.h>
 
 #include "config.h"
@@ -106,6 +107,12 @@ static void config_load_default(int i, char type) {
  *
  */
 bool config_parse(char *conf_file_path) {
+	// check if file exists
+	if (access(conf_file_path, F_OK) != 0) {
+		log_error("Configuration file is not accesible!");
+		return false;
+	}
+
 	// initialize configuration structure
 	config_init(&server_conf);
 

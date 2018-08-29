@@ -355,7 +355,7 @@ int producer_get_fds_n_by_nickname(char *nickname) {
 	return fd_n;
 }
 
-int producer_get_fds_n() {
+unsigned int producer_get_fds_n() {
 	check_mutex_lu_call(pthread_mutex_lock(&socket_mutex));
 	int fd_n = 0;
 	for (int i = 0; i < producer_max_connections; i++) {
