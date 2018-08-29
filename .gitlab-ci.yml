@@ -7,10 +7,12 @@ build:
      - apt update && apt -y install make gcc valgrind doxygen graphviz
   script: 
     - /bin/bash build_project.sh 1
+    - cd Release && make consegna
   artifacts:
     paths:
       - Release
       - doc/doxygen
+      - Release/FedericoSilvestri_CorsoA_chatty.tar
 test:
     stage: test
     before_script:
@@ -19,5 +21,4 @@ test:
         - /bin/bash Release/component_install.sh
     script:
         - cd Release && /bin/bash test_project.sh
-        - bin/bash scripts/component_uninstall.sh
-        - make consegna
+        - /bin/bash scripts/component_uninstall.sh
