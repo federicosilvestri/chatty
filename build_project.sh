@@ -37,8 +37,10 @@ echo "Launching make..."
 cd Release
 ls -a
 
-echo "Making deps"
-make deps
+if [ $x $1 ]; then
+    echo "Making deps"
+    make deps
+fi
 
 echo "Making chatty"
 make chatty

@@ -164,16 +164,10 @@ static void prepare_data(message_data_t *msg, char *nickname) {
 static bool check_connection(int index, message_t *msg) {
 	// check the sender
 	if (strlen(msg->hdr.sender) == 0) {
-		log_warn("Someone has sent anonymous message, rejecting");
+		log_fatal("Someone has sent anonymous message, rejecting");
 //		// disconnect client brutally
-//
-//		log_warn("msg->hdr.op = %d", msg->hdr.op);
-//		log_warn("msg->hdr.op = %s", msg->hdr.sender);
-//		log_warn("msg->data.hdr.len = %s", msg->data.hdr.len);
-//		log_warn("msg->data.hdr.receiver = %s", msg->data.hdr.receiver);
-
-//		producer_disconnect_host(index);
-		producer_unlock_socket(index);
+//		producer_unlock_socket(index);
+		producer_disconnect_host(index);
 		// no other operation are possible on socket.
 		return false;
 	}
@@ -244,12 +238,10 @@ static void worker_register_user(int index, message_t *msg) {
 	case 1:
 		hdr_reply.op = OP_NICK_ALREADY;
 		log_info("Cannot register user, nickname is already registered");
-		stats_update_errors(1);
 		break;
 	default:
 		log_error("User registration failed, return value: %d", reg_status);
 		hdr_reply.op = OP_FAIL;
-		stats_update_errors(1);
 		break;
 	}
 
@@ -275,7 +267,6 @@ static void worker_deregister_user(int index, message_t *msg) {
 		hdr_reply.op = OP_OK;
 		log_info("User DEregistered successfully");
 	} else {
-		stats_update_errors(1);
 		log_error("User DEregistration failed, maybe user does not exist");
 		hdr_reply.op = OP_FAIL;
 	}
@@ -296,7 +287,6 @@ static inline void worker_disconnect_user(int index, message_t *msg) {
 		USERMAN_STATUS_OFFL) == false) {
 			log_fatal("Cannot set user offline due to previous errors!");
 		}
-
 	} else if (opened_sockets <= 0) {
 		log_fatal("Current user is %s, but opened sockets are %d.",
 				msg->hdr.sender, opened_sockets);
@@ -328,7 +318,6 @@ static inline void worker_connect_user(int index, message_t *msg) {
 			log_error("Cannot send reply to client!");
 		}
 
-		stats_update_on_users(1, 0);
 		// send user list
 		worker_user_list(index, msg, false, USERMAN_GET_ONL);
 	} else {
@@ -340,7 +329,7 @@ static inline void worker_connect_user(int index, message_t *msg) {
 		}
 
 		// done
-		stats_update_errors(1);
+
 	}
 }
 
@@ -360,6 +349,7 @@ static void worker_posttxt(int index, message_t *msg) {
 		// invalid receiver
 		log_warn("User cannot send message to invalid user!");
 		reply_hdr.op = OP_NICK_UNKNOWN;
+		stats_update_errors(1);
 	} else if (msg->data.buf == NULL) {
 		// invalid buffer
 		log_warn("User has sent NULL message (buffer = NULL)");
@@ -367,6 +357,7 @@ static void worker_posttxt(int index, message_t *msg) {
 	} else if (strlen(msg->data.buf) > (unsigned int) max_message_size) {
 		log_warn("User has sent a too long message!");
 		reply_hdr.op = OP_MSG_TOOLONG;
+		stats_update_errors(1);
 	} else {
 		// message should be OK, no SQL Injection test?...
 		bool exists = userman_user_exists(msg->data.hdr.receiver);
@@ -374,9 +365,9 @@ static void worker_posttxt(int index, message_t *msg) {
 		if (exists == false) {
 			log_warn("User has sent a message to unknown user...");
 			reply_hdr.op = OP_NICK_UNKNOWN;
+		} else {
+			stop = false;
 		}
-
-		stop = false;
 	}
 
 	if (!stop) {
@@ -386,7 +377,7 @@ static void worker_posttxt(int index, message_t *msg) {
 		reply_hdr.op = OP_OK;
 		stats_update_ndev_msgs(1, 0);
 	} else {
-		stats_update_errors(1);
+//		stats_update_errors(1);
 	}
 
 	// an error is occurred, send header and stop.
@@ -472,7 +463,7 @@ static void worker_get_prev_msgs(int index, message_t *msg) {
 
 	if (ack_reply.op == OP_FAIL) {
 		userman_free_msgs(&list, NULL, prev_msgs_n, NULL, &is_file_list);
-		stats_update_errors(1);
+//		stats_update_errors(1);
 		return;
 	}
 
@@ -540,7 +531,7 @@ static void worker_postfile(int index, message_t *msg) {
 			"File Message sender: %s File Message Receiver: %s File Message body: %s",
 			msg->hdr.sender, msg->data.hdr.receiver, msg->data.buf);
 
-	// check if user exists
+	// checks for message
 	bool stop = true;
 	if (strlen(msg->data.hdr.receiver) <= 0) {
 		// invalid receiver
@@ -553,16 +544,17 @@ static void worker_postfile(int index, message_t *msg) {
 	} else if (strlen(msg->data.buf) > (unsigned int) max_message_size) {
 		log_warn("User has sent a too long message!");
 		reply_hdr.op = OP_MSG_TOOLONG;
+		stats_update_errors(1);
 	} else {
-		// message should be OK, no SQL Injection test?...
+		// message should be OK, check if destination user exists
 		bool exists = userman_user_exists(msg->data.hdr.receiver);
 
 		if (exists == false) {
 			log_warn("User has sent a message to unknown user...");
 			reply_hdr.op = OP_NICK_UNKNOWN;
+		} else {
+			stop = false;
 		}
-
-		stop = false;
 	}
 
 	if (!stop) {
@@ -602,12 +594,8 @@ static void worker_postfile(int index, message_t *msg) {
 		free(received_file.buf);
 
 		if (reply_hdr.op == OP_OK) {
-			stats_update_ndev_file(1,0);
-		} else {
-			stats_update_errors(1);
+			stats_update_ndev_file(1, 0);
 		}
-	} else {
-		stats_update_errors(1);
 	}
 
 	// send header
@@ -817,8 +805,10 @@ static void worker_send_live_message(int index) {
 			 * for file downloading.
 			 */
 			message_t file_msg;
-			if (readMsg(sockets[index], &file_msg) <= 0) {
-				log_error("Client has sent nothing...");
+			int read_msg_s = readMsg(sockets[index], &file_msg);
+
+			if (read_msg_s <= 0) {
+				log_error("Client hasn't sent the request for file downloading...");
 			}
 
 			if (file_msg.hdr.op != GETFILE_OP) {
@@ -883,6 +873,12 @@ void worker_run(amqp_message_t message) {
 	int read_size;
 	read_size = readMsg(sockets[index], &msg);
 
+	if (read_size < 0) {
+		// error in the socket, disconnect
+		producer_disconnect_host(index);
+		return;
+	}
+
 	if (read_size == 0) {
 		/*
 		 *
@@ -906,7 +902,7 @@ void worker_run(amqp_message_t message) {
 		if (nickname == NULL) {
 			// cache does not contains user nickname, disconnect brutally
 			producer_disconnect_host(index);
-			log_debug("Nickname not found... disconnected brutally");
+			log_warn("Nickname not found... disconnected brutally");
 		} else {
 			// compose the header
 			strcpy(msg.hdr.sender, nickname);
@@ -914,8 +910,6 @@ void worker_run(amqp_message_t message) {
 			free(nickname);
 			worker_disconnect_user(index, &msg);
 		}
-
-		stats_update_on_users(0, 1);
 
 		// no other operation are possible on socket.
 		return;

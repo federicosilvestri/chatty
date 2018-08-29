@@ -30,6 +30,7 @@
 #include <libconfig.h>
 #include <libgen.h>
 #include <pthread.h>
+#include <producer.h>
 
 #include "log.h"
 #include "config.h"
@@ -98,6 +99,10 @@ bool stats_init() {
 
 void stats_trigger() {
 	pthread_mutex_lock(&stat_mutex);
+
+	// retrieve online user
+	chattyStats.nonline = (unsigned long) producer_get_fds_n();
+
 	// open stat file
 	FILE *file_handle = fopen(stat_filename, "w");
 
@@ -120,7 +125,6 @@ void stats_trigger() {
 
 void stats_update_value(unsigned long add, unsigned long remove, unsigned long *dest) {
 	pthread_mutex_lock(&stat_mutex);
-
 	*dest += add;
 
 	if (*dest < remove) {

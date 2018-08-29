@@ -27,8 +27,8 @@
 #include <sys/mman.h>
 
 
-#include "connections.h"
-#include "ops.h"
+#include <connections.h>
+#include <ops.h>
 
 // tipo di operazione (usata internamente)
 typedef struct {
@@ -177,8 +177,6 @@ static int execute_requestreply(int connfd, operation_t *o) {
     if (mappedfile) { // devo inviare il file
 	message_data_t data;
 	setData(&data, "", mappedfile, o->size);
-	printf("File in %ld bytes", o->size);
-	fflush(stdout);
 	if (sendData(connfd, &data) == -1) { // invio il contenuto del file
 	    perror("sending data");
 	    fprintf(stderr, "ERRORE: spedendo il file %s\n", o->msg);
@@ -244,7 +242,7 @@ static int execute_requestreply(int connfd, operation_t *o) {
 	    return -1; 
 	}	
 	// numero di messaggi che devo ricevere
-	size_t nmsgs = *(size_t*)(msg.data.buf);  // c'è la len nell'header, perché usare la sizeof che non sempre funziona?
+	size_t nmsgs = *(size_t*)(msg.data.buf);
 	char *FILENAMES[nmsgs]; // NOTA: si suppone che nmsgs non sia molto grande
 	size_t nfiles=0;
 	for(size_t i=0;i<nmsgs;++i) {
@@ -585,4 +583,3 @@ int main(int argc, char *argv[]) {
     if (MSGS) free(MSGS);
     return r;
 }
-

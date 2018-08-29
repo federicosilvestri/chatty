@@ -49,7 +49,6 @@ struct statistics {
 extern struct statistics chattyStats;
 
 #define stats_update_reg_users(...) 	stats_update_value(__VA_ARGS__, &chattyStats.nusers)
-#define stats_update_on_users(...) 	stats_update_value(__VA_ARGS__, &chattyStats.nonline)
 #define stats_update_dev_msgs(...) 	stats_update_value(__VA_ARGS__, &chattyStats.ndelivered)
 #define stats_update_ndev_msgs(...) 	stats_update_value(__VA_ARGS__, &chattyStats.nnotdelivered)
 #define stats_update_dev_file(...) 	stats_update_value(__VA_ARGS__, &chattyStats.nfiledelivered)

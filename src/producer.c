@@ -36,6 +36,7 @@
 #include <amqp_tcp_socket.h>
 
 #include "message.h"
+#include "stats.h"
 
 #include "controller.h"
 #include "config.h"
@@ -223,6 +224,7 @@ static bool producer_socket_init() {
 		sockets_block[i] = false;
 		sockets_cu_nick[i] = calloc(sizeof(char),
 				sizeof(char) * (MAX_NAME_LENGTH + 1));
+		sockets_cu_nick[i][0] = '\0';
 	}
 
 	return true;
@@ -345,6 +347,19 @@ int producer_get_fds_n_by_nickname(char *nickname) {
 	int fd_n = 0;
 	for (int i = 0; i < producer_max_connections; i++) {
 		if (strcmp(nickname, sockets_cu_nick[i]) == 0) {
+			fd_n += 1;
+		}
+	}
+	check_mutex_lu_call(pthread_mutex_unlock(&socket_mutex));
+
+	return fd_n;
+}
+
+int producer_get_fds_n() {
+	check_mutex_lu_call(pthread_mutex_lock(&socket_mutex));
+	int fd_n = 0;
+	for (int i = 0; i < producer_max_connections; i++) {
+		if (strlen(sockets_cu_nick[i]) > 0) {
 			fd_n += 1;
 		}
 	}
@@ -551,6 +566,7 @@ static void *producer_run() {
 			// if no connection are discovered, manage the active
 			run_manage_conn();
 		}
+
 		check_mutex_lu_call(pthread_mutex_unlock(&socket_mutex));
 
 		/*

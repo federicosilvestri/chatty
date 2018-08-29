@@ -75,14 +75,16 @@ int openConnection(char* path, unsigned int ntimes, unsigned int secs) {
  * @return -1 in case of error 1 in case of success
  */
 int readPayload(long connfd, char *buffer, unsigned int length) {
-	char *tmp = buffer;
-
 	while (length > 0) {
-		int read_bytes = read(connfd, tmp, length);
-		if (read_bytes < 0)
-			return -1;
-		tmp += read_bytes;
-		length -= read_bytes;
+		ssize_t read_return = read(connfd, buffer, length);
+
+		if (read_return <= 0) {
+			return (int) read_return;
+		}
+
+		// address summing!
+		buffer += read_return;
+		length -= (int) read_return;
 	}
 
 	return 1;
@@ -99,9 +101,12 @@ int readPayload(long connfd, char *buffer, unsigned int length) {
 int writePayload(long connfd, char *buffer, unsigned int length) {
 	while (length > 0) {
 		int w_bytes = write(connfd, buffer, length);
-		if (w_bytes < 0) {
-			return -1;
+
+		if (w_bytes <= 0) {
+			return w_bytes;
 		}
+
+		// address summing!
 		buffer += w_bytes;
 		length -= w_bytes;
 	}
@@ -124,14 +129,22 @@ int readHeader(long connfd, message_hdr_t *hdr) {
 		return -1;
 	}
 
-	memset(hdr, 0, sizeof(message_hdr_t));
+	int header_len = sizeof(message_hdr_t);
+	message_hdr_t *hdr_cursor = hdr;
+	memset(hdr, 0, header_len);
 
-	int read_bytes = read(connfd, hdr, sizeof(message_hdr_t));
-	if (read_bytes < 0) {
-		return -1;
+	while (header_len > 0) {
+		int read_bytes = read(connfd, hdr_cursor, header_len);
+
+		if (read_bytes <= 0) {
+			return read_bytes;
+		}
+
+		hdr_cursor += read_bytes;
+		header_len -= read_bytes;
 	}
 
-	return (read_bytes == 0) ? 0 : 1;
+	return 1;
 }
 
 /**
@@ -150,14 +163,26 @@ int readData(long connfd, message_data_t *data) {
 	}
 
 	memset(data, 0, sizeof(message_data_t));
-	int data_hdr_size = read(connfd, &data->hdr, sizeof(message_data_hdr_t));
 
-	if (data_hdr_size <= 0) {
-		return data_hdr_size;
+	int data_hdr_size = sizeof(message_data_hdr_t);
+	message_data_hdr_t *data_hdr_cursor = &data->hdr;
+
+	while (data_hdr_size > 0) {
+		int read_size = read(connfd, data_hdr_cursor, data_hdr_size);
+
+		if (read_size <= 0) {
+			return read_size;
+		}
+
+		data_hdr_cursor += read_size;
+		data_hdr_size -= read_size;
+
 	}
 
+	// success
+
 	// read payload, if necessary
-	if (data->hdr.len != 0) {
+	if (data->hdr.len > 0) {
 		// prepare buffer
 		data->buf = malloc(data->hdr.len * sizeof(char));
 		memset(data->buf, 0, data->hdr.len * sizeof(char));
@@ -226,15 +251,15 @@ int sendRequest(long fd, message_t *msg) {
 	// writing header of message
 	int h_s = sendHeader((int) fd, &msg->hdr);
 
-	if (h_s < 0) {
-		return -1;
+	if (h_s <= 0) {
+		return h_s;
 	}
 
 	// writing data
 	int p_s = sendData(fd, &msg->data);
 
-	if (p_s < 0) {
-		return -1;
+	if (p_s <= 0) {
+		return p_s;
 	}
 
 	return 1;
@@ -254,16 +279,24 @@ int sendData(long fd, message_data_t *msg) {
 	}
 
 	// read header, first
-	int d_status = write(fd, &msg->hdr, sizeof(message_data_hdr_t));
+	message_data_hdr_t *message_hdr_cursor = &msg->hdr;
+	int header_w_size = sizeof(message_data_hdr_t);
 
-	if (d_status < 0) {
-		return -1;
+	while (header_w_size > 0) {
+		int d_status = write(fd, message_hdr_cursor, header_w_size);
+
+		if (d_status <= 0) {
+			return d_status;
+		}
+
+		message_hdr_cursor += d_status;
+		header_w_size -= d_status;
 	}
 
 	// send payload
 	int p_status = writePayload(fd, msg->buf, msg->hdr.len);
-	if (p_status < 0) {
-		return -1;
+	if (p_status <= 0) {
+		return p_status;
 	}
 
 	return 1;
@@ -280,12 +313,18 @@ int sendHeader(int fd, message_hdr_t *hdr) {
 		return -1;
 	}
 
-	int w_size = write(fd, hdr, sizeof(message_hdr_t));
+	int header_size = sizeof(message_hdr_t);
 
-	if (w_size < 0) {
-		return (int) w_size;
+	while (header_size > 0) {
+		int w_size = write(fd, hdr, header_size);
+
+		if (w_size <= 0) {
+			return (int) w_size;
+		}
+
+		hdr += w_size;
+		header_size -= w_size;
 	}
 
 	return 1;
 }
-

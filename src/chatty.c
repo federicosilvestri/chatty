@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	log_info("Welcome to chatty server!");
-	log_debug("Server PID: %d", getpid());
+	log_info("Server PID: %d", getpid());
 
 	/*
 	 * One time that server is started, while server is in

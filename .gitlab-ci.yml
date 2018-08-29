@@ -6,7 +6,7 @@ build:
      - export DEBIAN_FRONTEND=noninteractive
      - apt update && apt -y install make gcc valgrind doxygen graphviz
   script: 
-    - /bin/bash build_project.sh
+    - /bin/bash build_project.sh 1
   artifacts:
     paths:
       - Release
