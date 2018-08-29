@@ -6,6 +6,16 @@
  * originale dell'autore.
  *******************************************************************************/
 
+/*! \mainpage Chatty Project
+ *
+ * Progetto di LSO 2017/2018, sviluppato da Federico Silvestri, matricola 559014.
+ *
+ * \section Librerie Librerie esterne
+ * * rabbitmq
+ * * libconfig
+ * * sqlite3
+ */
+
 /**
  * @file chatty.c
  * @brief File principale del server chatterbox

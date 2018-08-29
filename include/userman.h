@@ -12,22 +12,6 @@
 #include "message.h"
 
 /**
- * A very primitive data structure
- * for user.
- */
-typedef struct {
-	/**
-	 * Username of registered user.
-	 */
-	char *username;
-	/**
-	 * A timestamp format of last login.
-	 */
-	long last_login;
-} userman_user_t;
-
-
-/**
  * Constant for user list function.
  * This option will tell function to return all users.
  */

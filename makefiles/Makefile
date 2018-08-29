@@ -14,7 +14,9 @@ FILE_DA_CONSEGNARE=Makefile chatty.c chatty.h message.h ops.h stats.h config.h \
 		   amqp_utils.c log.c controller.c signal_manager.c \
 		   amqp_utils.h log.h controller.h signal_manager.h \
 		   producer.h producer.c consumer.c consumer.h worker.c stats.c \
-		   worker.h userman.h userman.c
+		   worker.h userman.h userman.c component_install.sh \
+		   component_uninstall.sh script_chattyfiles.sh
+
 # inserire il nome del tarball: es. NinoBixio
 TARNAME=FedericoSilvestri
 # inserire il corso di appartenenza: CorsoA oppure CorsoB
@@ -22,7 +24,7 @@ CORSO=CorsoA
 #
 # inserire l'email sulla quale ricevere comunicazione sul progetto
 # e per sostenere l'esame
-MAIL=silves.federico@gmail.com
+MAIL=f.silvestri10@studenti.unipi.it
 #
 ###########################################################
 
