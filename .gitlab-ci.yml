@@ -19,8 +19,5 @@ test:
         - /bin/bash Release/component_install.sh
     script:
         - cd Release && /bin/bash test_project.sh
-
-clean:
-    stage: clean
-    script:
         - bin/bash scripts/component_uninstall.sh
+        - make consegna
