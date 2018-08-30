@@ -5,6 +5,13 @@
  * Si dichiara che il contenuto di questo file e' in ogni sua parte opera
  * originale dell'autore.
  *******************************************************************************/
+
+/**
+ * @brief This file contains the implementation
+ * of connection functions required by project
+ * @file connections.c
+ */
+
 #include "connections.h"
 
 #include <stdio.h>
@@ -150,7 +157,7 @@ int readHeader(long connfd, message_hdr_t *hdr) {
 /**
  * @brief Legge il body del messaggio
  *
- * @param fd     descrittore della connessione
+ * @param connfd     descrittore della connessione
  * @param data   puntatore al body del messaggio
  *
  * @return <=0 se c'e' stato un errore
@@ -204,7 +211,7 @@ int readData(long connfd, message_data_t *data) {
 /**
  * @brief Legge l'intero messaggio
  *
- * @param fd     descrittore della connessione
+ * @param connfd     descrittore della connessione
  * @param msg   puntatore al messaggio
  *
  * @return <=0 se c'e' stato un errore

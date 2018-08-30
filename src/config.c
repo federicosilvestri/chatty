@@ -6,8 +6,9 @@
  * originale dell'autore.
  *******************************************************************************/
 /**
- * This file is the configuration manager of project.
- * It is a wrapper of "libconfig" library.
+ * This file it's a wrapper of "libconfig" library.
+ *
+ * @brief This file is the configuration manager of project.
  * @file config.c
  */
 

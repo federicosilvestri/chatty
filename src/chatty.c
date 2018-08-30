@@ -153,13 +153,6 @@ int main(int argc, char *argv[]) {
 	return 0;
 }
 
-/**
- * This function checks if argument passed by system are valid or not.
- *
- * @param argc system argument count
- * @param argv system argument
- * @return true if arguments are valid, false otherwise
- */
 static bool checkandget_arguments(int argc, char *argv[], int* log_level) {
 	if (argc < 3 || argc == 4) {
 		usage(argv[0]);
@@ -189,9 +182,6 @@ static bool checkandget_arguments(int argc, char *argv[], int* log_level) {
 	return true;
 }
 
-/**
- * Clean the workspace used by chatty
- */
 static void clean_workspace() {
 	config_clean();
 	log_destroy();

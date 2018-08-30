@@ -9,6 +9,7 @@
  * This file contains functions related to producer component.
  * Producer is the component that produces requests to be sent
  * to queue.
+ * @brief This file contains the functions that describe the producer component.
  * @file producer.c
  */
 
@@ -106,17 +107,17 @@ static char **sockets_cu_nick;
  * Mutex for giving an exclusive access
  * to array of sockets
  */
-pthread_mutex_t socket_mutex;
+static pthread_mutex_t socket_mutex;
 
 /**
  * Set of read file descriptor
  */
-fd_set read_fds;
+static fd_set read_fds;
 
 /**
  * Set of write file descriptors
  */
-fd_set write_fds;
+static fd_set write_fds;
 
 /**
  * Socket structure for RabbitMQ connection

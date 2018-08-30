@@ -5,6 +5,10 @@
  * Si dichiara che il contenuto di questo file e' in ogni sua parte opera
  * originale dell'autore.
  *******************************************************************************/
+/**
+ * @brief header of producer.c
+ * @file producer.h
+ */
 #ifndef PRODUCER_H
 #define PRODUCER_H
 
@@ -15,6 +19,9 @@
  * Make Eclipse Code Control happy
  */
 #ifndef SIGBLOCK
+/**
+ * To make Eclipse happy, I need to define this constant.
+ */
 #define SIGBLOCK 1
 #endif
 

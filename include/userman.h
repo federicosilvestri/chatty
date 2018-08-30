@@ -5,7 +5,13 @@
  * Si dichiara che il contenuto di questo file e' in ogni sua parte opera
  * originale dell'autore.
  *******************************************************************************/
+/**
+ *
+ * @brief header of userman.c
+ * @file userman.h
+ */
 #ifndef USERMAN_H
+#define USERMAN_H
 
 #include <stdbool.h>
 
@@ -216,5 +222,4 @@ size_t userman_get_file(char *filename, char **buf);
  */
 void userman_destroy();
 
-#define USERMAN_H
 #endif /* USERMAN_H */

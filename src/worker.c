@@ -10,6 +10,8 @@
  * The worker contains socket-synchronous functions to process
  * each single message sent by producer and received by consumer.
  * Each function is thread-safe for definition.
+ *
+ * @brief The worker component of architecture
  * @file worker.c
  */
 

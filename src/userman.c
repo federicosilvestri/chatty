@@ -9,6 +9,8 @@
  * This file contains utility functions
  * to manage users and groups using SQLite3 Database.
  * Each function is thread-safe for definition.
+ *
+ * @brief This file contains the functions to manage users, groups and datastore.
  * @file userman.c
  */
 

@@ -8,6 +8,7 @@
 /**
  * This file contains the consumer component of the architecture.
  * The consumer dequeues messages from RabbitMQ and processes it.
+ * @brief File that contains the functions of Consumer component.
  * @file consumer.c
  */
 

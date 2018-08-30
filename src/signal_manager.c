@@ -7,8 +7,13 @@
  *******************************************************************************/
 
 /**
+ * This file is not a signal handler but it's a signal manager.
+ * It doesn't set a specific sigaction for a specific signal,
+ * it registers all signals to be managed by program, using
+ * the `signal_manager_wait_signal` function.
+ *
+ * @brief this file contains the functions to manage signals.
  * @file signal_manager.c signal management header file.
- * @brief it manages all signals triggered by system.
  */
 
 /**
@@ -29,6 +34,9 @@
 
 #include "log.h"
 
+/**
+ * Signals to register.
+ */
 static const int signals[] = { SIGPIPE, SIGINT, SIGUSR1, SIGQUIT, SIGTERM };
 
 /**

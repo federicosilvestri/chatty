@@ -10,6 +10,7 @@
  * Not written completely by me, but optimized for POSIX threads
  * and adapted for this project.
  *
+ * @brief File to manage simple logging system.
  * @file log.c
  */
 

@@ -5,6 +5,12 @@
  * Docenti: Prencipe, Torquati
  * 
  */
+
+/**
+ * @brief header of stats.c
+ * @file stats.h
+ */
+
 #ifndef CHATTY_STATS
 #define CHATTY_STATS
 
@@ -48,11 +54,34 @@ struct statistics {
 
 extern struct statistics chattyStats;
 
+/**
+ * Macro to update the value of nusers.
+ */
 #define stats_update_reg_users(...) 	stats_update_value(__VA_ARGS__, &chattyStats.nusers)
+
+/**
+ * Macro to update the value of ndelivered
+ */
 #define stats_update_dev_msgs(...) 	stats_update_value(__VA_ARGS__, &chattyStats.ndelivered)
+
+/**
+ * Macro to update the value of nnotdelivered
+ */
 #define stats_update_ndev_msgs(...) 	stats_update_value(__VA_ARGS__, &chattyStats.nnotdelivered)
+
+/**
+ * Macro to update the value of nfiledelivered
+ */
 #define stats_update_dev_file(...) 	stats_update_value(__VA_ARGS__, &chattyStats.nfiledelivered)
+
+/**
+ * Macro to update the value of nfilenotdelivered
+ */
 #define stats_update_ndev_file(...) 	stats_update_value(__VA_ARGS__, &chattyStats.nfilenotdelivered)
+
+/**
+ * Macro to update the value of nerrors
+ */
 #define stats_update_errors(...)		stats_update_value(__VA_ARGS__, 0,  &chattyStats.nerrors)
 
 /**

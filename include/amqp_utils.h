@@ -6,12 +6,20 @@
  * originale dell'autore.
  *******************************************************************************/
 
+/**
+ * @brief Headers of amqp_utils.c
+ * @file amqp_utils.h
+ */
+
 #ifndef AMQP_UTILS_H_
 #define AMQP_UTILS_H_
 
 #include <stdbool.h>
 #include <amqp.h>
 
+/**
+ * The default name for queue.
+ */
 #define RABBIT_QUEUE_NAME "chatty-queue"
 
 /**

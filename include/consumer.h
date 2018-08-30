@@ -5,6 +5,11 @@
  * Si dichiara che il contenuto di questo file e' in ogni sua parte opera
  * originale dell'autore.
  *******************************************************************************/
+/**
+ * @brief header of consumer.c
+ * @file consumer.h
+ */
+
 #ifndef CONSUMER_H_
 #define CONSUMER_H_
 

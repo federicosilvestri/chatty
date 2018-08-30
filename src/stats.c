@@ -9,6 +9,7 @@
 /**
  * This file manages the runtime statistics of
  * server.
+ * @brief Implementation of statistics.
  * @file stats.c
  */
 

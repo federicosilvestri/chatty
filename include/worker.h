@@ -5,6 +5,12 @@
  * Si dichiara che il contenuto di questo file e' in ogni sua parte opera
  * originale dell'autore.
  *******************************************************************************/
+/**
+ *
+ * @brief header of worker.c
+ * @file worker.h
+ */
+
 #ifndef WORKER_H_
 #define WORKER_H_
 

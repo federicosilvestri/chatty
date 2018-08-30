@@ -6,6 +6,11 @@
  * originale dell'autore.
  *******************************************************************************/
 
+/**
+ * @brief header of log.c
+ * @file log.h
+ */
+
 #ifndef LOG_H
 #define LOG_H
 
@@ -18,11 +23,34 @@
  */
 enum { LOG_TRACE, LOG_DEBUG, LOG_INFO, LOG_WARN, LOG_ERROR, LOG_FATAL };
 
+/**
+ * Log trace macro
+ */
 #define log_trace(...) log_log(LOG_TRACE, __FILE__, __LINE__, __VA_ARGS__)
+
+/**
+ * Log debug macro
+ */
 #define log_debug(...) log_log(LOG_DEBUG, __FILE__, __LINE__, __VA_ARGS__)
+
+/**
+ * Log info macro
+ */
 #define log_info(...)  log_log(LOG_INFO,  __FILE__, __LINE__, __VA_ARGS__)
+
+/**
+ * Log warn macro
+ */
 #define log_warn(...)  log_log(LOG_WARN,  __FILE__, __LINE__, __VA_ARGS__)
+
+/**
+ * Log error macro
+ */
 #define log_error(...) log_log(LOG_ERROR, __FILE__, __LINE__, __VA_ARGS__)
+
+/**
+ * Log fatal macro
+ */
 #define log_fatal(...) log_log(LOG_FATAL, __FILE__, __LINE__, __VA_ARGS__)
 
 /**

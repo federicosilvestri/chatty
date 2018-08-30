@@ -5,6 +5,11 @@
  * Si dichiara che il contenuto di questo file e' in ogni sua parte opera
  * originale dell'autore.
  *******************************************************************************/
+/**
+ * @brief header of controller.c
+ * @file controller.h
+ */
+
 #ifndef CONTROLLER_H
 #define CONTROLLER_H
 

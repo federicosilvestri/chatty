@@ -7,6 +7,7 @@
  *******************************************************************************/
 
 /**
+ * @brief header of signal_manager.c
  * @file signal_manager.h contains signal manager definitions.
  */
 

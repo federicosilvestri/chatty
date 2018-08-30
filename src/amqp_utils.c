@@ -6,7 +6,7 @@
  * originale dell'autore.
  *******************************************************************************/
 /**
- * This file is a simple manager of RabbitMQ server.
+ * @brief This file is a simple manager of RabbitMQ server.
  * @file amqp_utils.c
  */
 
@@ -58,13 +58,6 @@ const char *rabmq_exchange;
  */
 const char *rabmq_bindkey;
 
-/**
- * This function retrieves RabbitMQ parameters by server_conf
- * variable and store information on static variables.
- *
- * @brief rabbit parameters initialization
- * @return true on success, false on error
- */
 bool rabmq_init_params() {
 	// fetching parameters from master
 	if (config_lookup_string(&server_conf, "RabbitMQHostname",

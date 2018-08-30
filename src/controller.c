@@ -9,6 +9,7 @@
  * This file contains the controller component of architecture.
  * Controller is responsible for consumer and producer creation and
  * control.
+ * @brief File that contains the functions to manage server.
  * @file controller.c
  */
 /**
