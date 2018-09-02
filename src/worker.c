@@ -168,8 +168,7 @@ static bool check_connection(int index, message_t *msg) {
 	if (strlen(msg->hdr.sender) == 0) {
 		log_fatal("Someone has sent anonymous message, rejecting");
 //		// disconnect client brutally
-//		producer_unlock_socket(index);
-		producer_disconnect_host(index);
+		producer_unlock_socket(index);
 		// no other operation are possible on socket.
 		return false;
 	}
