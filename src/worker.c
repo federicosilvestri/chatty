@@ -876,6 +876,7 @@ void worker_run(amqp_message_t message) {
 	read_size = readMsg(sockets[index], &msg);
 
 	if (read_size < 0) {
+		log_fatal("Socket read returns -1!");
 		// error in the socket, disconnect
 		producer_disconnect_host(index);
 		return;

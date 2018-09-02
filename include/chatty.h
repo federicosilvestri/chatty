@@ -22,7 +22,7 @@ typedef int make_iso_compilers_happy;
 /**
  * The standard log level to use when log level argument is not passed.
  */
-#define STD_LOG_LEVEL 6
+#define STD_LOG_LEVEL 4
 #endif
 
 #include <stdbool.h>
