@@ -21,7 +21,7 @@ Questo documento contiene la documentazione relativa al progetto Chatty del modu
 
 \section{Architecture}
 L'architettura utilizzata per lo sviluppo del progetto \`e basata sul modello \textbf{producer/consumer},
-con l'aggiunta di un ulteriore componente \textbf{controller} che ha la responsabilit\`a di pilotare quest'ultimi.
+con l'aggiunta di un ulteriore componente \textbf{controller} che ha la responsabilit\`a di pilotarli.
 Sia producer che consumer sono gestiti unicamente dal controller che offre un meccanismo per lo scambio delle informazioni
 e ne assicura il sincronismo. Di seguito verranno descritte le funzionalit\`a pincipali di ogni singolo componente.
 
@@ -79,14 +79,14 @@ Il consumer si occupa dunque di processarla ed eventualmente di:
 
 \paragraph{Controller}
 Siccome \textbf{P e C} non sono in grado di essere
-autonomi, c'\`e bisogno di un ulteriore componente che coordina
-le operazioni principali, ovvero che esegue al momento giusto
+autonomi, c'\`e bisogno di un ulteriore componente che coordini
+le operazioni principali, ovvero che esegua al momento giusto
 e nell'ordine giusto i metodi che sono stati descritti
 nel modello base. In particolare i punti pi\`u critici sono lo startup e lo 
 shutdown, in quanto viene gestita la memoria e controllata
 la correttezza della configurazione passata al sistema.
  
-Ipotiziamo per esempio che non venisse eseguito il metodo \textit{init()}.
+Ipotiziamo per esempio che non venga eseguito il metodo \textit{init()}.
 Questo comporterebbe che la memoria non verrebbe allocata 
 e dunque durante il runtime si genererebbe un errore, molto probabilmente
 di segmentazione.
@@ -98,10 +98,10 @@ vale anche per i file descriptor.
 \\
 Le fasi di inizializzazione e distruzione non hanno un ordine ben preciso,
 in generale tutti i componenti possono essere inizializzati o distrutti
-anche concorrentemente. Ovviamente a differenza di queste le fasi
+anche contemporaneamente. Ovviamente a differenza di queste, le fasi
 di avvio e stop devono essere eseguite secondo l'ordine prestabilito
 dalle necessit\`a dei componenti.
-In questo contesto il producer viene avviato prima del consumer, perch\`e
+In questo contesto il producer viene avviato prima del consumer perch\`e
 la gestione delle socket delle connessioni \`e affidata completamente al
 producer ed \`e di fondamentale importanza per il consumer.
 
@@ -109,7 +109,7 @@ producer ed \`e di fondamentale importanza per il consumer.
 Il producer viene lanciato come un thread separato dal processo principale,
 in modo da poterlo rendere indipendente da esso in termini di segnali e di interazione con l'utente.
 Durante la fase di inizializzazione viene creata e bindata la socket sulla quale
-arriveranno le richieste da parte dei client, controllando che non sia gi\`a stata
+arriveranno le richieste da parte dei client, dopo aver controllato che non sia gi\`a stata
 utilizzata da un altro processo in esecuzione.
 Infatti un requisito fondamentale per l'avvio del producer \`e proprio quello appena descritto: la mutua esclusivit\`a sulla socket di ascolto.
 Una volta controllate le condizioni sufficienti all'avvio, con il  metodo \textit{producer\_init()}, viene lanciato il thread producer,
@@ -162,7 +162,7 @@ Tutte queste funzionalit\`a sono state implementate nelle libreria nominata \tex
 
 \section{Librerie esterne}
 Per lo sviluppo di questo progetto sono state utilizzate delle librerie esterne, non tanto per semplificare, ma per rendere
-pi\`u efficiente e stabile possibile l'applicazione.
+pi\`u efficiente e stabile l'applicazione.
 
 \subsection{RabbitMQ}
 La gestione delle code \`e  stato uno degli argomenti informatici pi\`u richiesti e pi\`u studiati nel giro degli ultimi anni.
@@ -216,7 +216,7 @@ sulla coda di RabbitMQ.
 Un'altra libreria che viene utilizzata \`e la famosa SQLite3, ovvero una libreria che permette di creare un database relazionale
 all'interno di un singolo file con estensione .sqlite.
 Questa scelta \`e stata fatta affinch\`e il progetto potesse avere una base solida, veloce e affidabile per la gestione dei dati.
-In particolare, al posto di creare un sistema "artigianale" in caso per la memorizazione di strutture dati, sono state create
+In particolare, al posto di creare un sistema "artigianale" per la memorizazione di strutture dati, sono state create
 tabelle e query, per poter memorizzare utenti, messaggi e gruppi.
 
 \paragraph{Tables}
@@ -259,10 +259,10 @@ adeguati al formato richiesto dalla libreria, cio\`e sono stati aggiunti i doppi
 parametro stringa.
 
 \subsection{Log}
-La libreria di log \`e quella pi\`u semplice che \`e stata utilizzata. Non richiede l'installazione di file .so,
-perch\`e \`e inclusa nel progetto stesso. Infatti il file \textit{log.c} e il relativo header \textit{log.h} contengono
+La libreria di log \`e quella pi\`u semplice che \`e stata utilizzata perch\`e non richiede l'installazione di file .so,
+ed \`e inclusa nel progetto stesso. Infatti il file \textit{log.c} e il relativo header \textit{log.h} contengono
 le funzioni per la gestione dei logs.
-Principalmente ci sono 4 livelli di log che possono essere utilizzati, e sono:
+Principalmente ci sono 6 livelli di log che possono essere utilizzati, e sono:
 
 \begin{itemize}
 	\item \textit{FATAL}
@@ -327,16 +327,16 @@ In caso di test negativo, \`e stato ribuildato il progetto sulla macchina locale
 i problemi incontrati.
 
 \subsection{Problemi che possono verificarsi}
-Il problema che pu\`o verificarsi, durante la fase di testing \`e un errore che poteva essere soppresso,
+Il problema che pu\`o verificarsi durante la fase di testing \`e un errore che poteva essere soppresso,
 ed \`e dovuto al problema dell'incompletezza del protocollo usato dal client.
 In sostanza si verifica perch\`e non c'\`e modo di capire il momento in cui il client \`e in ascolto per nuovi
 messaggi oppure \`e in ascolto per altri motivi.
 Infatti nel protocollo seguito dal client per qualsiasi cosa si voglia fare viene inviata una richiesta
 al server con il codice dell'operazione, tranne per la ricezione di messaggi.
-In questo modo il server non \`e in grado di capire le intenzioni del client, e dunque utilizza una
+In questo modo il server non \`e in grado di capire le intenzioni del client, dunque utilizza una
 strategia brutale ma funzionante, cio\`e utilizza il terzo parametro della funzione $select$ per capire
-quando c'\`e spazio disponibile sul buffer della socket e se l'utente \`e autenticato, allora
-viene inserito nella coda un messaggio di tipo $WRITE$. Alcune volte si verifica il messagio di 
+quando c'\`e spazio disponibile sul buffer della socket e se l'utente \`e autenticato. Il caso
+viene inserito nella coda con un messaggio di tipo $WRITE$. Alcune volte si verifica il messagio di 
 errore "Broken pipe", ed \`e riferito al fatto che il server tentando di controllare lo stato dell'utente
 (ormai disconnesso), riceve dal kernel la disconnessione.
 Tuttavia questo errore che non \`e stato possibile evitare, se non:
@@ -344,7 +344,8 @@ Tuttavia questo errore che non \`e stato possibile evitare, se non:
 	\item modificando il protocollo del client
 	\item aggiungendo una sleep durante la fase di ricezione
 \end{itemize}
-non ha prodotto problemi rilevanti durante il runtime del client, dunque anche durante i test.
+Nonostante ci\`o non ha prodotto problemi rilevanti durante il runtime del client, dunque anche durante i test,
+anche perch\`e non era possibile fare di meglio.
 
 \pagebreak
 
