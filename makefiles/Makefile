@@ -9,7 +9,6 @@
 ##########################################################
 # IMPORTANTE: completare la lista dei file da consegnare
 # 
-<<<<<<< HEAD
 FILE_DA_CONSEGNARE=Makefile amqp_utils.c chatty.c config.c \
 connections.c consumer.c controller.c log.c producer.c \
 signal_manager.c stats.c userman.c worker.c \
