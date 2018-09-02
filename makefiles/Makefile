@@ -15,7 +15,7 @@ FILE_DA_CONSEGNARE=Makefile chatty.c chatty.h message.h ops.h stats.h config.h \
 		   amqp_utils.h log.h controller.h signal_manager.h \
 		   producer.h producer.c consumer.c consumer.h worker.c stats.c \
 		   worker.h userman.h userman.c component_install.sh \
-		   component_uninstall.sh script_chattyfiles.sh
+		   component_uninstall.sh script_chattyfiles.sh doc/relazione/Relazione.pdf
 
 # inserire il nome del tarball: es. NinoBixio
 TARNAME=FedericoSilvestri

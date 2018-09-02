@@ -1,0 +1,21 @@
+\contentsline {section}{\numberline {1}Architecture}{2}{section.1}
+\contentsline {subparagraph}{Una breve descrizione del modello}{2}{section*.2}
+\contentsline {paragraph}{Producer}{2}{section*.3}
+\contentsline {paragraph}{Consumer}{2}{section*.4}
+\contentsline {paragraph}{Controller}{3}{section*.5}
+\contentsline {paragraph}{Implementazione del producer}{3}{section*.6}
+\contentsline {paragraph}{Implementazione del consumer}{4}{section*.7}
+\contentsline {section}{\numberline {2}Librerie esterne}{4}{section.2}
+\contentsline {subsection}{\numberline {2.1}RabbitMQ}{5}{subsection.2.1}
+\contentsline {paragraph}{Configurazione}{5}{section*.8}
+\contentsline {paragraph}{Utilizzo}{5}{section*.9}
+\contentsline {subsection}{\numberline {2.2}SQLite3}{6}{subsection.2.2}
+\contentsline {paragraph}{Tables}{6}{section*.10}
+\contentsline {subsection}{\numberline {2.3}Libconfig}{6}{subsection.2.3}
+\contentsline {paragraph}{Formato del file di configurazione}{6}{section*.11}
+\contentsline {subsection}{\numberline {2.4}Log}{7}{subsection.2.4}
+\contentsline {section}{\numberline {3}Struttura del codice}{7}{section.3}
+\contentsline {section}{\numberline {4}Configurazione del server}{8}{section.4}
+\contentsline {section}{\numberline {5}Piattaforme testate}{8}{section.5}
+\contentsline {subsection}{\numberline {5.1}Problemi che possono verificarsi}{8}{subsection.5.1}
+\contentsline {section}{\numberline {6}Riferimenti}{9}{section.6}
