@@ -1,0 +1,366 @@
+% !TeX spellcheck = it_IT
+\documentclass[]{article}
+\usepackage[]{algorithm2e}
+\usepackage{float}
+\usepackage{listings}
+\usepackage{hyperref}
+
+%opening
+\title{SOL - Progetto Chatty}
+\author{Federico Silvestri 559014}
+
+\begin{document}
+\maketitle
+
+
+\begin{abstract}
+Questo documento contiene la documentazione relativa al progetto Chatty del modulo Laboratorio del corso A di Sistemi Operativi anno 2017/2018.
+\end{abstract}
+\tableofcontents
+\pagebreak
+
+\section{Architecture}
+L'architettura utilizzata per lo sviluppo del progetto \`e basata sul modello \textbf{producer/consumer},
+con l'aggiunta di un ulteriore componente \textbf{controller} che ha la responsabilit\`a di pilotarli.
+Sia producer che consumer sono gestiti unicamente dal controller che offre un meccanismo per lo scambio delle informazioni
+e ne assicura il sincronismo. Di seguito verranno descritte le funzionalit\`a pincipali di ogni singolo componente.
+
+\subparagraph[Una breve descrizione del modello]{Il modello}
+Prima di descrivere l'architettura componente per componente \`e necessario illustrare il modello base che viene seguito.
+Tecnicamente parlando esso prevede l'implementazione dei seguenti metodi:
+
+\begin{figure}[H]
+	\begin{table}[H]
+		\begin{tabular}{ll}			
+			\textbf{name} & \textbf{description} \\
+			component\_init() & lettura configurazione, allocazione memoria \\
+			component\_start() & creazione del thread/thread pool \\
+			component\_stop() & invio del segnale di stop al(la) thread/thread pool \\
+			component\_destroy() & iberazione memoria, chiusura file descriptors \\
+		\end{tabular}
+	\end{table}
+\end{figure}
+
+Questi quattro metodi garantiscono la robustezza e la sicurezza in quanto ognuno di essi racchiude
+tutte le operazioni necessarie affinch\`e la memoria sia allocata e liberata, i file descriptor
+aperti e chiusi, i thread avviati e stoppati.
+
+\paragraph{Producer}
+Il producer generalmente \`e il componente che si occupa di produrre il lavoro da far eseguire al
+consumer: in questo caso la produzione di lavoro \`e intesa come la ricezione di eventi sulle socket
+aperte dai client.
+
+Per fare un esempio: quando un client invia un messaggio di REGISTER\_OP, quest'ultimo provoca
+l'attivazione del Producer che dovr\`a occuparsi di gestire tale richiesta in modo pi\`u
+veloce e \textit{fair} possibile, anche se non dovr\`a essere lui stesso a doverla
+processare.
+
+Sintetizzando, le responsabilit\`a principali del Producer sono:
+\begin{itemize}
+	\item Creazione e binding della socket di ascolto
+	\item Accettazione delle nuove connessioni
+	\item Migrazione della richiesta al producer
+\end{itemize}
+
+Una volta che la richiesta \`e stata presa in carico dal consumer,
+il producer non ha nessun altra responsabilit\`a su di essa.
+
+\paragraph{Consumer}
+Le richieste che vengono messe all'interno della coda di attesa, vengono
+ricevute in modo sequenziale da una delle istanze del componente consumer
+(in quanto multithread), che \`e l'endpoint del flusso di trasferimento della richiesta.
+
+Il consumer si occupa dunque di processarla ed eventualmente di:
+\begin{itemize}
+	\item rimanere in attesa di un altro evento
+	\item chiudere la connessione
+	\item rilasciare la connessione al producer
+\end{itemize}
+
+\paragraph{Controller}
+Siccome \textbf{P e C} non sono in grado di essere
+autonomi, c'\`e bisogno di un ulteriore componente che coordini
+le operazioni principali, ovvero che esegua al momento giusto
+e nell'ordine giusto i metodi che sono stati descritti
+nel modello base. In particolare i punti pi\`u critici sono lo startup e lo 
+shutdown, in quanto viene gestita la memoria e controllata
+la correttezza della configurazione passata al sistema.
+ 
+Ipotiziamo per esempio che non venga eseguito il metodo \textit{init()}.
+Questo comporterebbe che la memoria non verrebbe allocata 
+e dunque durante il runtime si genererebbe un errore, molto probabilmente
+di segmentazione.
+Altra ipotesi: se non venisse eseguito il metodo \textit{destroy},
+la memoria utilizzata dai componenti non verrebbe deallocata,
+generando di conseguenza i temuti \textit{memory leaks}, lo stesso discorso
+vale anche per i file descriptor.
+\\
+\\
+Le fasi di inizializzazione e distruzione non hanno un ordine ben preciso,
+in generale tutti i componenti possono essere inizializzati o distrutti
+anche contemporaneamente. Ovviamente a differenza di queste, le fasi
+di avvio e stop devono essere eseguite secondo l'ordine prestabilito
+dalle necessit\`a dei componenti.
+In questo contesto il producer viene avviato prima del consumer perch\`e
+la gestione delle socket delle connessioni \`e affidata completamente al
+producer ed \`e di fondamentale importanza per il consumer.
+
+\paragraph{Implementazione del producer}
+Il producer viene lanciato come un thread separato dal processo principale,
+in modo da poterlo rendere indipendente da esso in termini di segnali e di interazione con l'utente.
+Durante la fase di inizializzazione viene creata e bindata la socket sulla quale
+arriveranno le richieste da parte dei client, dopo aver controllato che non sia gi\`a stata
+utilizzata da un altro processo in esecuzione.
+Infatti un requisito fondamentale per l'avvio del producer \`e proprio quello appena descritto: la mutua esclusivit\`a sulla socket di ascolto.
+Una volta controllate le condizioni sufficienti all'avvio, con il  metodo \textit{producer\_init()}, viene lanciato il thread producer,
+che si occuper\`a di gestire le connessioni con il seguente algoritmo:
+
+\begin{algorithm}[H] 
+	\While{server\_status == RUNNING}{
+		socksMutex.lock();
+		init\_fds()\;
+		socksMutex.unlock()\;
+		select(read\_fds, write\_fds)\;
+		socksMutex.lock()\;
+		
+		\eIf{newConn()}{
+			manageNewConn()\;
+		}{
+			manageCurrentConns()\;
+		}
+		socksMutex.unlock()\;
+	}
+	\caption{The producer algorithm}
+\end{algorithm}
+
+La variabile \textit{socksMutex} fa riferimento al meccanismo di sincronizzazione
+che viene utilizzato per la mutua esclusivit\`a dell'accesso al vettore delle socket.
+Il vettore delle socket, chiamato \textit{sockets} all'interno del codice, contiene
+$n$ interi ognuno dei quali rappresenta il filedescriptor di una specifica connessione.
+Tale vettore viene messo sotto controllo da un mutex perch\`e il consumer stesso lo utilizza
+per processare la richiesta dell'utente.
+Una volta che una connessione \`e stata presa in carico da un consumer in esecuzione,
+gli viene data la responsabilit\`a di tutti gli eventi relativi a quella socket, fino a
+che non viene rilasciata dal consumer stesso.
+Questo meccanismo viene implementato attraverso il vettore $socket_blocks$, che contiene
+$n$ booleani, dove $n$ \`e il numero massimo di connessioni.
+
+\paragraph{Implementazione del consumer}
+A differenza del producer, il consumer invece pu\`o essere lanciato in modalit\`a multithread.
+Infatti all'interno del file di configurazione il parametro \textit{ThreadsInPool} specifica
+quanti thread dovranno essere creati per gestire tutte le richieste.
+L'obiettivo del consumer \`e quello di occuparsi dell'evento che \`e ricevuto nella socket.
+Per evento si intende:
+\begin{itemize}
+	\item la scrittura di un messaggio dal client
+	\item la disponibilit\`a di spazio sul buffer
+\end{itemize}
+Nel caso in cui si parli di scrittura da parte del client, il consumer si occuper\`a di leggere
+il messaggio ed eseguire tutte le procedure per completare la richiesta.
+Nel in cui si parli di lettura il consumer invierà i messaggi disponibili al client.
+Tutte queste funzionalit\`a sono state implementate nelle libreria nominata \textit{worker}.
+
+\section{Librerie esterne}
+Per lo sviluppo di questo progetto sono state utilizzate delle librerie esterne, non tanto per semplificare, ma per rendere
+pi\`u efficiente e stabile l'applicazione.
+
+\subsection{RabbitMQ}
+La gestione delle code \`e  stato uno degli argomenti informatici pi\`u richiesti e pi\`u studiati nel giro degli ultimi anni.
+Per questo motivo sono stati sviluppati diversi software che forniscono un servizio di \textit{Message brokering},
+ovvero di scambio di messaggi tra componenti di software diversi.
+La scelta che \`e stata fatta per questo progetto \`e stata quella di usare \textit{RabbitMQ}, in quanto \`e uno dei 
+pi\`u semplici e pi\`u user friendly con il linguaggio C.
+RabbitMQ \`e dunque una dipendenza del progetto che viene installata automaticamente durante la fase di build di
+chatty, e viene automaticamente disinstallata una volta lanciato lo script di pulizia.
+
+\paragraph{Configurazione}
+La configurazione di RabbitMQ avviene durante le fasi di inizializzazione del producer e del consumer.
+In particolare vengono fatte due configurazioni diverse, ognuna delle quali \`e caratterizzata da una
+connessione TCP dedicata verso il server RabbitMQ.
+
+In generale quello che viene fatto per configurare l'applicazione sono le seguenti azioni:
+\begin{itemize}
+	\item creazione dell'exchage di tipo fanout
+	\item creazione della coda per l'exchange
+	\item binding della coda all'exchange
+\end{itemize}
+All'interno del file di configurazione possono essere configurati ulteriori parametri, che sono indicati
+nella sezione configurazione.
+
+\paragraph{Utilizzo}
+RabbitMQ viene utilizzanto fondamentalmente nel progetto, ovvero esso \`e il mezzo di comunicazione tra
+producer e consumer.
+Quando il producer identifica l'arrivo di un evento all'interno della socket, compone un messaggio, 
+compilando un array con la seguente struttura:
+
+\begin{itemize}
+	\item nell'indice 0 viene inserito il tipo di azione, se WRITE o READ.
+	\item nell'indice 1 viene inserito l'indice del file descriptor della socket.
+\end{itemize}
+Una volta che il messaggio \`e stato ricevuto da RabbitMQ, lo inserisce all'interno della coda
+gi\`a preconfigurata durante la fase di init.
+Ad eseguire l'operazione di \textit{dequeue} \`e il consumer, che sfruttando un meccanismo
+ad eventi, sveglia il thread dallo stato di \textit{WAIT} e lo porta in \textit{RUN}.
+Una volta che RabbitMQ si accorge che tale messaggio \`e  stato preso in carico da un agente (nel nostro caso un'instanza del Consumer),
+lo rimuove dalle coda, marcandolo come completato.
+In questo modo il sistema \`e risultato fair e stabile durante la fase di test.
+
+\begin{center}
+\textbf{	Attenzione, il mapping tra connessione e thread non \`e strettamente 1:1}
+\end{center}
+
+Questo perch\`e quando il thread ha completato una richiesta, rilascia la socket attraverso il metodo \textit{producer\_release\_socket()}, riattivando dunque il producer a scansionare gli eventi relativi. Il thread che termina la richiesta, viene rimesso in attesa di messaggi
+sulla coda di RabbitMQ.
+
+\subsection{SQLite3}
+Un'altra libreria che viene utilizzata \`e la famosa SQLite3, ovvero una libreria che permette di creare un database relazionale
+all'interno di un singolo file con estensione .sqlite.
+Questa scelta \`e stata fatta affinch\`e il progetto potesse avere una base solida, veloce e affidabile per la gestione dei dati.
+In particolare, al posto di creare un sistema "artigianale" per la memorizazione di strutture dati, sono state create
+tabelle e query, per poter memorizzare utenti, messaggi e gruppi.
+
+\paragraph{Tables}
+Le tabelle che vengono create sono le seguenti:
+
+\begin{figure}[H]
+	\begin{table}[H]
+		\begin{tabular}{lll}			
+			\textbf{table} & \ \textbf{Primary key} & \textbf{description} \\
+			users & nickname & contiene tutti gli utenti che si sono registrati \\
+			messages & ID & contiene tutti i messaggi che sono stati inviati dagli utenti
+		\end{tabular}
+	\end{table}
+\end{figure}
+
+La gestione del database \`e completamente affidata al worker, ovvero a quel file descritto nella documentazione
+del codice che contiene tuttte le funzionalit\'a per la persistenza dei dati.
+Come \textbf{P e C} anche il worker deve essere inizializzato e distrutto ma non implementa un modello asincrono.
+Le funzioni del worker sono tutte thread safe, dunque non c'\`e bisogno di implementare meccanismi di sincronismo, a
+differenza del datastore.
+
+\subsection{Libconfig}
+Questa libreria viene utilizzata dalla maggior parte del mondo opensource per la lettura e il parsing di file
+di configurazione, infatti \`e gi\`a installata nelle distro come Ubuntu, Debian e Centos.
+La sua inizializzazione viene eseguita subito dopo il controllo degli argomenti passati al server.
+Nel caso in cui il file di configurazione non esista, sia illeggibile (parlando di permessi), o contenga
+un errore di sintassi, viene lanciato immediatamente un errore (\textit{config error}).
+
+\paragraph{Formato del file di configurazione}
+Il formato del file di configurazione, come specificato nella documentazione della libreria, \`e quello standard,
+ovvero del tipo:
+\begin{lstlisting}
+	<conf-name> = <conf-value>
+	<conf-value> := "<string-value>" | <other-types>
+\end{lstlisting}
+Gli altri tipi di configurazione messi a disposizione da LibConfig, come per esempio quelli per gli oggetti,
+non sono stati utilizzati per questo progetto.
+C'\`e da fare particolare attenzione alla differenza ai file \textit{.conf1} e \textit{.conf2}, perch\`e sono stati
+adeguati al formato richiesto dalla libreria, cio\`e sono stati aggiunti i doppi apici all'inizio e alla fine di un
+parametro stringa.
+
+\subsection{Log}
+La libreria di log \`e quella pi\`u semplice che \`e stata utilizzata perch\`e non richiede l'installazione di file .so,
+ed \`e inclusa nel progetto stesso. Infatti il file \textit{log.c} e il relativo header \textit{log.h} contengono
+le funzioni per la gestione dei logs.
+Principalmente ci sono 6 livelli di log che possono essere utilizzati, e sono:
+
+\begin{itemize}
+	\item \textit{FATAL}
+	\item \textit{ERROR}
+	\item \textit{WARN}
+	\item \textit{INFO}
+	\item \textit{DEBUG}
+	\item \textit{TRACE}
+\end{itemize}
+
+\`E anche possibile usufruire di un ulteriore funzionalit\`a chiamata \textit{QUITE}, che consente
+di sopprimere tutti i tipi di errori che sono stati lanciati.
+Questa libreria \`e anche stata resa dal sottoscritto thread safe, utilizzando un meccanismo
+di mutua esclusione.
+
+\section{Struttura del codice}
+Il codice consegnato in realt\`a non \`e stato sviluppato nella struttura cos\`i  come si trova,
+bens\`i sono state generate le directory
+
+\begin{itemize}
+	\item \textit{src} per tutti i file \textit{.c}
+	\item \textit{include} per tutti i file \textit{.h}
+	\item \textit{scripts} per tutti i file \textit{.sh}
+	\item \textit{makefiles} per tutti i Makefile che sono stati testati
+	\item \textit{DebugGCC/DebugClang/Release} per tutti i file processati dai rispettivi compilatori
+\end{itemize}
+
+Per rendere la struttura del progetto conforme a quella richiesta, \`e stato creato uno script
+build\_project che esegue la copia dei file dentro le directory nella directory \textit{Release}.
+Infatti i file consegnati sono esattamente quelli dentro la directory Release.
+Se ci fosse necessit\`a di ispezionare gli ulteriori file del progetto \`e possibile scaricare
+l'intero progetto dalla repository git da:
+\url{https://git.com.divisible.net/federicosilvestri/chatty}
+che per\`o richiede l'autenticazione da parte dello studente.
+
+\section{Configurazione del server}
+Oltre ai parametri richiesti nelle specifiche sono stati aggiunti altri parametri, descritti
+nella seguente tabella:
+
+\begin{figure}[H]
+	\begin{table}[H]
+		\begin{tabular}{lll}			
+			\textbf{name} & \textbf{type} & \textbf{description} \\
+			$RabbitMQHostname$ & string & l'hostname del server RabbitMQ \\ 
+			$RabbitMQPort$ & integer & la porta sulla quale \`e in ascolto il server RabbitMQ \\
+			$RabbitExchange$ & string & il nome dell'Exchange da creare per lo scambio dei messaggi \\
+			$RabbitBindKey$ & string & chiave per proteggere l'exchange da binding sconosciuti. \\
+		\end{tabular}
+	\end{table}
+\end{figure}
+
+\section{Piattaforme testate}
+Il progetto \`e stato sviluppato usando un sistema di Continuos Testing, fornito da \href{https://www.gitlab.com/}{Gitlab}.
+Pertanto ogni volta che veniva eseguito un commit nel master branch,  seguendo il file di configurazione
+\textit{.gitlab-ci.yml} (non fornito nella consegna), il sistema buildava il progetto ed eseguiva i test sotto ambienti:
+\begin{itemize}
+	\item Ubuntu 18.04
+	\item Ubuntu 16.04
+	\item Debian 9
+\end{itemize}
+In caso di test negativo, \`e stato ribuildato il progetto sulla macchina locale, in modo da debuggare al meglio
+i problemi incontrati.
+
+\subsection{Problemi che possono verificarsi}
+Il problema che pu\`o verificarsi durante la fase di testing \`e un errore che poteva essere soppresso,
+ed \`e dovuto al problema dell'incompletezza del protocollo usato dal client.
+In sostanza si verifica perch\`e non c'\`e modo di capire il momento in cui il client \`e in ascolto per nuovi
+messaggi oppure \`e in ascolto per altri motivi.
+Infatti nel protocollo seguito dal client per qualsiasi cosa si voglia fare viene inviata una richiesta
+al server con il codice dell'operazione, tranne per la ricezione di messaggi.
+In questo modo il server non \`e in grado di capire le intenzioni del client, dunque utilizza una
+strategia brutale ma funzionante, cio\`e utilizza il terzo parametro della funzione $select$ per capire
+quando c'\`e spazio disponibile sul buffer della socket e se l'utente \`e autenticato. Il caso
+viene inserito nella coda con un messaggio di tipo $WRITE$. Alcune volte si verifica il messagio di 
+errore "Broken pipe", ed \`e riferito al fatto che il server tentando di controllare lo stato dell'utente
+(ormai disconnesso), riceve dal kernel la disconnessione.
+Tuttavia questo errore che non \`e stato possibile evitare, se non:
+\begin{itemize}
+	\item modificando il protocollo del client
+	\item aggiungendo una sleep durante la fase di ricezione
+\end{itemize}
+Nonostante ci\`o non ha prodotto problemi rilevanti durante il runtime del client, dunque anche durante i test,
+anche perch\`e non era possibile fare di meglio.
+
+\pagebreak
+
+\section{Riferimenti}
+\begin{figure}[H]
+	\begin{table}[H]
+		\begin{tabular}{ll}
+			Gitlab & \url{www.gitlab.com} \\
+			RabbitMQ & \url{www.rabbitmq.com} \\
+			SQLite3 & \url{www.sqlite3.org} \\
+			LibConfig & \url{https://hyperrealm.github.io/libconfig} \\
+		\end{tabular}
+	\end{table}
+\end{figure}
+
+
+
+\end{document}

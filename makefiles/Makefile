@@ -9,13 +9,15 @@
 ##########################################################
 # IMPORTANTE: completare la lista dei file da consegnare
 # 
+<<<<<<< HEAD
 FILE_DA_CONSEGNARE=Makefile amqp_utils.c chatty.c config.c \
 connections.c consumer.c controller.c log.c producer.c \
 signal_manager.c stats.c userman.c worker.c \
 amqp_utils.h chatty.h config.h connections.h consumer.h \
 controller.h log.h message.h ops.h signal_manager.h \
 stats.h userman.h worker.h script_chattyfiles.sh \
-component_install.sh component_uninstall.sh
+component_install.sh component_uninstall.sh \
+doc/relazione/Relazione.pdf
 
 # inserire il nome del tarball: es. NinoBixio
 TARNAME=FedericoSilvestri
