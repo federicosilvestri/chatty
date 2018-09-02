@@ -31,6 +31,8 @@ cp -r ./include/* Release/
 cp ./makefiles/Makefile Release/
 cp -r ./scripts/* Release/
 cp -r ./DATA Release/
+cp -r doc Release/
+
 chmod a+x ./Release/*.sh
 
 echo "Launching make..."
